@@ -21,25 +21,28 @@ INSTALLER_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ui_section_header "MÓDULO 05: APLICAÇÕES DE USUÁRIO E MULTIMÍDIA"
 
 # 1. Instalação dos Aplicativos do Usuário e Codecs
+log_info "Sincronizando ffmpeg com repositório RPM Fusion (swap ffmpeg-free -> ffmpeg)..."
+sudo dnf swap -y --allowerasing ffmpeg-free ffmpeg || true
+
 log_info "Instalando aplicações desktop e utilitários multimídia..."
 APPS_PACKAGES="$(read_package_list "${INSTALLER_ROOT}/config/packages-apps.conf")"
 
 if [[ -n "$APPS_PACKAGES" ]]; then
     # shellcheck disable=SC2086
-    sudo dnf install -y $APPS_PACKAGES
+    sudo dnf install -y --allowerasing $APPS_PACKAGES
 else
     log_warn "Lista config/packages-apps.conf está vazia ou inacessível."
 fi
 
 # 2. Instalação do Navegador Brave Origin (com contingência oficial)
 log_info "Instalando navegador web Brave Origin (sem IA/crypto)..."
-if ! sudo dnf install -y brave-origin; then
+if ! sudo dnf install -y --allowerasing brave-origin; then
     log_warn "brave-origin não encontrado diretamente nos repositórios DNF. Disparando instalador oficial via curl..."
     if curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh; then
         log_success "Brave Origin instalado com sucesso via instalador oficial."
     else
         log_warn "Falha no script de instalação do Brave Origin. Tentando pacote brave-browser padrão..."
-        sudo dnf install -y brave-browser || log_warn "Não foi possível instalar pacote do Brave via DNF."
+        sudo dnf install -y --allowerasing brave-browser || log_warn "Não foi possível instalar pacote do Brave via DNF."
     fi
 else
     log_success "Brave Origin instalado com sucesso via DNF."

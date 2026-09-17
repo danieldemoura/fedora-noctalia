@@ -52,7 +52,7 @@ log_success "Repositório Brave configurado com sucesso."
 # 4. Habilitação do Flathub Oficial
 log_info "Configurando Flatpak e repositório Flathub..."
 sudo dnf install -y flatpak
-flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
+sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
 log_success "Repositório Flathub adicionado com sucesso."
 
 # 5. Atualização e Sincronização dos Metadados

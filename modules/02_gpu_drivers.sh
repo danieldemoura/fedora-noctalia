@@ -20,7 +20,14 @@ INSTALLER_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 ui_section_header "MÓDULO 02: DRIVERS GRÁFICOS E GPU"
 
-# 1. Instalação dos Drivers Livres Mesa (Base universal para todas as máquinas)
+# Checagem de isolamento para Máquinas Virtuais (VM)
+if [[ "${IS_VM:-false}" == true ]]; then
+    log_info "Ambiente de Máquina Virtual detectado. Drivers de GPU dedicada e híbrida (switcheroo-control, VA-API) foram ignorados na VM."
+    log_success "Módulo 02 (Drivers Gráficos) concluído (modo VM)."
+    return 0 2>/dev/null || exit 0
+fi
+
+# 1. Instalação dos Drivers Livres Mesa (Base universal para todas as máquinas físicas)
 log_info "Instalando pilha de aceleração gráfica aberta (Mesa DRI/Vulkan/VA-API)..."
 sudo dnf install -y \
     mesa-dri-drivers \
