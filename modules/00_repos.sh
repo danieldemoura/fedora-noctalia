@@ -31,10 +31,14 @@ sudo dnf install -y \
 log_success "RPM Fusion configurado com sucesso."
 
 # 2. Instalação do Repositório Terra (Fyra Labs)
-log_info "Configurando repositório Terra (Fyra Labs) para Umbriel e Noctalia Greeter..."
-sudo dnf install -y --nogpgcheck \
-    --repofrompath "terra,https://repos.fyralabs.com/terra\$releasever" terra-release terra-gpg-keys
-log_success "Repositório Terra configurado com sucesso."
+if ! rpm -q terra-release &>/dev/null && [ ! -f /etc/yum.repos.d/terra.repo ]; then
+    log_info "Configurando repositório Terra (Fyra Labs)..."
+    sudo dnf install -y --nogpgcheck \
+        --repofrompath "terra,https://repos.fyralabs.com/terra\$releasever" terra-release terra-gpg-keys
+    log_success "Repositório Terra configurado com sucesso."
+else
+    log_info "Repositório Terra já está instalado e configurado. Pulando etapa..."
+fi
 
 # 3. Instalação do Repositório Brave Software
 log_info "Configurando repositório oficial do Brave Browser..."
