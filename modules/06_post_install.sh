@@ -38,35 +38,26 @@ fi
 # 2. Configuração do Umbriel (~/.config/umbriel/config.toml)
 UMBRIEL_CONFIG_DIR="${REAL_HOME}/.config/umbriel"
 UMBRIEL_CONFIG_FILE="${UMBRIEL_CONFIG_DIR}/config.toml"
-SYSTEM_UMBRIEL_CONF="/usr/share/umbriel/config.toml"
 
 log_info "Configurando ambiente do Umbriel em ${UMBRIEL_CONFIG_FILE}..."
 sudo -u "${REAL_USER}" mkdir -p "${UMBRIEL_CONFIG_DIR}"
-
-if [[ -f "${SYSTEM_UMBRIEL_CONF}" ]]; then
-    if [[ ! -f "${UMBRIEL_CONFIG_FILE}" ]]; then
-        sudo -u "${REAL_USER}" cp "${SYSTEM_UMBRIEL_CONF}" "${UMBRIEL_CONFIG_FILE}"
-        log_info "Arquivo base copiado de ${SYSTEM_UMBRIEL_CONF}."
-    fi
-fi
 
 # Backup do config do Umbriel se já existir
 if [[ -f "${UMBRIEL_CONFIG_FILE}" ]]; then
     backup_file "${UMBRIEL_CONFIG_FILE}" false
 fi
 
-# Determina comandos de autostart
+# Determina comandos de autostart e flags de hardware
 NOCTALIA_CMD="noctalia"
 if [[ "${IS_VM:-false}" == true ]]; then
     NOCTALIA_CMD="env LIBGL_ALWAYS_SOFTWARE=1 noctalia"
 fi
 
-# Script embutido de merge seguro para o config.toml do Umbriel
-log_info "Injetando seções de autostart, teclado e atalhos no config do Umbriel..."
+log_info "Gerando arquivo de configuração válido e limpo do Umbriel..."
 
 python3 - <<PYEOF
 import os
-import sys
+import tomllib
 
 config_file = "${UMBRIEL_CONFIG_FILE}"
 is_vm = ("${IS_VM:-false}".lower() == "true")
@@ -74,91 +65,75 @@ is_abnt2 = ("${KEYBOARD_ABNT2:-true}".lower() == "true")
 polkit_bin = "${POLKIT_AGENT_PATH}"
 noctalia_cmd = "${NOCTALIA_CMD}"
 
-# Se arquivo não existe ou está vazio, cria modelo base
-existing_content = ""
-if os.path.exists(config_file):
-    with open(config_file, "r", encoding="utf-8") as f:
-        existing_content = f.read()
-
-# Blocos a serem injetados
-custom_blocks = []
-
-# Seção General / Autostart
-autostart_block = f"""
-# --- Configuração Automatizada Fedora Noctalia ---
-[general]
-autostart = [
-    "{noctalia_cmd}",
-    "{polkit_bin}"
+# Monta o arquivo de configuração limpo e sem tabelas duplicadas
+lines = [
+    "# ==============================================================================",
+    "# Umbriel Compositor Configuration - Fedora Noctalia",
+    "# ==============================================================================",
+    "",
+    "[general]",
+    "autostart = [",
+    f'    "{noctalia_cmd}",',
+    f'    "{polkit_bin}"',
+    "]",
+    "",
+    "[input.cursor]",
+    f"hardware_cursor = {'false' if is_vm else 'true'}",
+    ""
 ]
-"""
-custom_blocks.append(autostart_block)
 
-# Seção de Cursor para VM
-if is_vm:
-    cursor_block = """
-[input.cursor]
-hardware_cursor = false
-"""
-    custom_blocks.append(cursor_block)
-
-# Seção de Layout de Teclado
 if is_abnt2:
-    kbd_block = """
-[input.keyboard]
-xkb_layout = "br"
-"""
-    custom_blocks.append(kbd_block)
+    lines.extend([
+        "[input.keyboard]",
+        'xkb_layout = "br"',
+        ""
+    ])
 
-# Seção de Atalhos Essenciais
-keybinds_block = """
-# Atalhos Multimídia, Captura e Bloqueio de Tela
-[[keybind]]
-keys = ["XF86AudioRaiseVolume"]
-command = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
+lines.extend([
+    "# Atalhos Multimídia, Captura e Bloqueio de Tela",
+    "[[keybind]]",
+    'keys = ["XF86AudioRaiseVolume"]',
+    'command = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"',
+    "",
+    "[[keybind]]",
+    'keys = ["XF86AudioLowerVolume"]',
+    'command = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"',
+    "",
+    "[[keybind]]",
+    'keys = ["XF86AudioMute"]',
+    'command = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"',
+    "",
+    "[[keybind]]",
+    'keys = ["XF86MonBrightnessUp"]',
+    'command = "brightnessctl set 5%+"',
+    "",
+    "[[keybind]]",
+    'keys = ["XF86MonBrightnessDown"]',
+    'command = "brightnessctl set 5%-"',
+    "",
+    "[[keybind]]",
+    'keys = ["Print"]',
+    "command = 'grim -g \"$(slurp)\" - | wl-copy'",
+    "",
+    "[[keybind]]",
+    'keys = ["Mod4", "l"]',
+    'command = "swaylock -c 000000"',
+    "",
+    "[[keybind]]",
+    'keys = ["Mod4", "Return"]',
+    'command = "kitty"',
+    ""
+])
 
-[[keybind]]
-keys = ["XF86AudioLowerVolume"]
-command = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+toml_content = "\n".join(lines)
 
-[[keybind]]
-keys = ["XF86AudioMute"]
-command = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
-
-[[keybind]]
-keys = ["XF86MonBrightnessUp"]
-command = "brightnessctl set 5%+"
-
-[[keybind]]
-keys = ["XF86MonBrightnessDown"]
-command = "brightnessctl set 5%-"
-
-[[keybind]]
-keys = ["Print"]
-command = "grim -g \\"$(slurp)\\" - | wl-copy"
-
-[[keybind]]
-keys = ["Mod4", "l"]
-command = "swaylock -c 000000"
-
-[[keybind]]
-keys = ["Mod4", "Return"]
-command = "kitty"
-"""
-custom_blocks.append(keybinds_block)
-
-# Remove seções customizadas anteriores se já existirem para idempotência
-clean_content = existing_content
-marker = "# --- Configuração Automatizada Fedora Noctalia ---"
-if marker in clean_content:
-    clean_content = clean_content.split(marker)[0].rstrip()
-
-new_content = clean_content + "\n" + "\n".join(custom_blocks) + "\n"
+# Valida sintaxe antes de gravar
+tomllib.loads(toml_content)
 
 with open(config_file, "w", encoding="utf-8") as f:
-    f.write(new_content)
+    f.write(toml_content)
 
-print("[OK] Arquivo config.toml atualizado com sucesso.")
+print("[OK] Arquivo config.toml do Umbriel gerado e validado com sucesso.")
 PYEOF
 
 # Garante permissões estritas para o usuário real
@@ -222,7 +197,9 @@ fi
 if python3 -c "import tomllib; tomllib.loads(open('${UMBRIEL_CONFIG_FILE}').read())" 2>/dev/null; then
     log_success "[Checklist] Sintaxe TOML de ${UMBRIEL_CONFIG_FILE} validada com sucesso."
 else
-    log_info "[Checklist] Arquivo ${UMBRIEL_CONFIG_FILE} gerado e legível."
+    log_error "[Checklist] Falha crítica: Erro de sintaxe TOML em ${UMBRIEL_CONFIG_FILE}!"
+    python3 -c "import tomllib; tomllib.loads(open('${UMBRIEL_CONFIG_FILE}').read())"
+    exit 1
 fi
 
 # Teste 5: Permissões do usuário

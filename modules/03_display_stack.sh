@@ -24,6 +24,16 @@ ui_section_header "MÓDULO 03: PILHA DO DISPLAY MANAGER E LOGIN"
 log_info "Instalando greetd, políticas SELinux e noctalia-greeter..."
 sudo dnf install -y greetd greetd-selinux noctalia-greeter
 
+# Permissões de hardware para o usuário do greetd
+log_info "Configurando permissões de hardware (video, render, input) para o usuário greetd..."
+sudo usermod -aG video,render,input greetd 2>/dev/null || true
+
+# Execução do script oficial de setup do sistema do Noctalia Greeter (se presente)
+if [ -f /usr/share/noctalia-greeter/setup_greeter_system.sh ]; then
+    log_info "Executando setup do sistema do noctalia-greeter..."
+    sudo /usr/share/noctalia-greeter/setup_greeter_system.sh || true
+fi
+
 # 2. Configuração do /etc/greetd/config.toml
 log_info "Configurando /etc/greetd/config.toml..."
 sudo mkdir -p /etc/greetd
