@@ -1,0 +1,3 @@
+# Integração com o Gnome Keyring para desbloqueio automático de senhas
+auth       optional    pam_gnome_keyring.so
+session    optional    pam_gnome_keyring.so auto_start
