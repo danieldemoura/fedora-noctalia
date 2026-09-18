@@ -533,3 +533,69 @@ Abaixo está o registro técnico consolidado de todos os comportamentos inespera
 | **Isolamento de Máquina Virtual** | Módulo de GPU tentava configurar `switcheroo-control` e VA-API dedicados na VM. | Saída antecipada limpa (`return 0`) no início de `02_gpu_drivers.sh` quando `IS_VM=true`. |
 | **Display Manager em VM (Greetd)** | Usuário `greetd` não possuía acesso ao hardware de vídeo resultando em tela preta no boot. | Atribuição dos grupos `video,render,input` ao usuário `greetd` e flags de renderização por software (`LIBGL_ALWAYS_SOFTWARE=1`). |
 | **Chaveiro GNOME Keyring** | Diálogo "Choose password for new keyring" exibido no primeiro boot. | Inicialização prévia de `${REAL_HOME}/.local/share/keyrings/default` apontando para `login` com permissão `700/600`. |
+
+---
+
+## 9. ESCOPO DE VERSÃO E COMPATIBILIDADE FUTURA
+
+### 9.1 Versão Mínima Suportada: Fedora 44 (Estrita)
+
+O suporte começa **exclusivamente no Fedora 44** pelos seguintes motivos técnicos objetivos:
+
+* O pacote `noctalia` (shell gráfico C++/QtQuick) foi admitido nos repositórios oficiais do Fedora **a partir da versão 44**. Em Fedora 43 ou inferior, o pacote simplesmente não existe no índice do DNF — nenhum COPR legado ou build manual pode substituí-lo de forma equivalente.
+* O `umbriel-nightly` depende de versões de biblioteca (`libwlroots`, Qt6 Wayland) que atingiram maturidade suficiente no ciclo F44.
+* O DNF5 (substituto definitivo do DNF4) foi promovido a componente padrão a partir do F41, mas a API de resolução de `$releasever` via `dnf config-manager` que o módulo `00_repos.sh` utiliza está estável e testada somente a partir do F44.
+
+**Qualquer IA ou desenvolvedor que tente retroportar este instalador para versões anteriores deve desconsiderar completamente esta especificação** — a falta dos pacotes-chave torna o processo de retroporte inviável sem mudanças arquiteturais profundas.
+
+### 9.2 Forward Compatibility: Design Auto-Adaptativo
+
+O instalador foi deliberadamente projetado para **não envelhecer** ao avançar pelas versões futuras do Fedora. Os mecanismos de auto-adaptação são:
+
+| Componente | Mecanismo | Comportamento |
+| :--- | :--- | :--- |
+| Espelhos RPM Fusion | `$(rpm -E %fedora)` | Expande para o número da versão em runtime (ex: `44`, `45`, `46`…) |
+| Repositório Terra | `$releasever` | Resolvido nativamente pelo DNF5 sem hardcode |
+| Pacotes do sistema | Resolução de dependências DNF5 | Versões atuais são sempre selecionadas automaticamente |
+| `packages-base.conf` / `packages-apps.conf` | Listas de nomes de pacotes (sem pin de versão) | Sempre instala a versão mais recente disponível |
+
+**Nenhuma linha de código dos módulos precisa ser editada** para suportar o Fedora 45, 46 ou versões superiores — desde que os pacotes `noctalia` e `umbriel-nightly` continuem disponíveis nos repositórios officiais e no Terra.
+
+---
+
+## 10. ARQUITETURA DO SUBSISTEMA DE CREDENCIAIS
+
+### 10.1 Estado Atual: `gnome-keyring` + PAM (Fedora 44)
+
+A instalação mínima do Fedora (Netinstall/Everything) **não inclui nenhum provedor de Secrets Service por padrão**. O módulo `06_post_install.sh` implementa a inicialização do subsistema da seguinte forma:
+
+**Pacotes instalados pelo módulo `01_system_hardware.sh` ou `03_display_stack.sh`:**
+- `gnome-keyring` — daemon que implementa o protocolo D-Bus `org.freedesktop.Secrets`.
+- `gnome-keyring-pam` — módulo PAM que inicializa o daemon no momento do login.
+
+**Configuração PAM (`/etc/pam.d/greetd`):**
+```
+auth     optional  pam_gnome_keyring.so
+session  optional  pam_gnome_keyring.so  auto_start
+```
+Isso garante que o daemon seja iniciado automaticamente com a sessão do `greetd` e que o chaveiro seja desbloqueado pela senha do usuário sem nenhuma interação extra.
+
+**Pré-inicialização do diretório de keyrings (`06_post_install.sh`):**
+```bash
+KEYRINGS_DIR="${REAL_HOME}/.local/share/keyrings"
+sudo -u "${REAL_USER}" mkdir -p "${KEYRINGS_DIR}"
+echo "login" | sudo -u "${REAL_USER}" tee "${KEYRINGS_DIR}/default" >/dev/null
+chmod 700 "${KEYRINGS_DIR}"
+```
+O ponteiro `default` informa ao `gnome-keyring` qual chaveiro deve ser desbloqueado automaticamente no login. Sem esse arquivo, o GNOME Keyring exibe o diálogo *"Choose password for new keyring"* no primeiro boot — **armadilha eliminada definitivamente por esta pré-inicialização**.
+
+### 10.2 Roadmap Futuro: Migração para `oo7`
+
+O `oo7` é uma implementação do **Secrets Service Provider** em Rust, desenvolvido pela equipe da Fyra Labs como substituto moderno e leve do `gnome-keyring` no ecossistema Noctalia. Quando o pacote estiver disponível e estável nos repositórios Terra ou Fedora oficiais:
+
+1. Substituir `gnome-keyring` + `gnome-keyring-pam` por `oo7` nos módulos de instalação.
+2. Avaliar se o protocolo D-Bus exposto é 100% compatível com `libsecret` (consumido por aplicações como o Brave, Git Credential Manager etc.).
+3. Adaptar o bloco PAM para o mecanismo de desbloqueio nativo do `oo7`.
+
+**Enquanto a migração não ocorre, o `gnome-keyring` é o provedor canônico e estável para Fedora 44.**
+

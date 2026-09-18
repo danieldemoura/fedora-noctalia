@@ -123,6 +123,35 @@ chmod +x setup.sh modules/*.sh
 
 ---
 
+## 🗓️ Compatibilidade de Versão do Fedora
+
+> [!IMPORTANT]
+> **Fedora 44 ou superior é obrigatório.** O pacote `noctalia` (e o `umbriel-nightly`) foram publicados nos repositórios oficiais do Fedora a partir da versão 44. Versões anteriores (Fedora 43 ou mais antigas) **não possuem os pacotes necessários e a instalação irá falhar**.
+
+O instalador foi projetado para acompanhar automaticamente o ciclo de lançamentos do Fedora sem precisar de atualizações manuais:
+
+- O endereço dos espelhos do **RPM Fusion** usa `$(rpm -E %fedora)`, que resolve para o número da versão atual em tempo de execução.
+- O repositório **Terra** usa `$releasever`, resolvido nativamente pelo DNF5.
+- Ambos funcionam corretamente em **Fedora 44, 45, 46…** sem qualquer alteração no código.
+
+---
+
+## 🔑 Gerenciamento de Credenciais (Chaveiro / Keyring)
+
+O instalador configura automaticamente o subsistema de credenciais para que o **cofre de senhas não seja solicitado no primeiro login** (problema do diálogo *"Choose password for new keyring"*).
+
+### O que é feito automaticamente
+
+* O diretório `~/.local/share/keyrings/` é criado com permissão `700`.
+* Um ponteiro padrão é gerado, vinculando o chaveiro ao **PAM** (login automático e integrado à senha de sessão).
+* O `gnome-keyring-daemon` é inicializado via `pam_gnome_keyring.so` no arquivo PAM do `greetd`.
+
+### Roadmap futuro (`oo7`)
+
+Atualmente a base do Fedora 44 usa o `gnome-keyring` como provedor padrão do protocolo **Secrets Service (D-Bus)**. Uma futura migração para o `oo7` (implementação moderna em Rust) é prevista nos repositórios Fyra Labs. Quando disponível, o instalador será atualizado para substituir o provedor — **nenhuma ação é necessária por parte do usuário**.
+
+---
+
 ## 🔍 Solução de Problemas e Auditoria
 
 * **Log Detalhado:** O histórico completo de execução com timestamps é gravado em:
