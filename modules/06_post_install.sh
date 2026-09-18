@@ -108,9 +108,18 @@ layout = "us"
 """
 
 # 1. Limpeza de customizações anteriores para garantir idempotência
-marker = "# --- Atalhos Personalizados Fedora Noctalia ---"
-if marker in content:
-    content = content.split(marker)[0].rstrip() + "\n"
+marker_header = "# ------------------------------------------------------------------------------\n# Atalhos Personalizados Fedora Noctalia (Multimídia, Brilho, Print e Bloqueio)"
+if marker_header in content:
+    content = re.sub(
+        r'# ------------------------------------------------------------------------------\s*\n# Atalhos Personalizados Fedora Noctalia \(Multimídia, Brilho, Print e Bloqueio\)\s*\n# ------------------------------------------------------------------------------\s*\n.*?(?=\n\s*(?:\[|#\s*[-=]+\s*Layout|\Z))',
+        '',
+        content,
+        flags=re.DOTALL
+    )
+
+old_marker = "# --- Atalhos Personalizados Fedora Noctalia ---"
+if old_marker in content:
+    content = content.split(old_marker)[0].rstrip() + "\n"
 
 # 2. Configuração de [general] e autostart
 autostart_str = f'autostart = ["{noctalia_cmd}", "{polkit_bin}"]'
@@ -144,39 +153,30 @@ if is_abnt2:
     else:
         content += f"\n[input.keyboard]\n{layout_val}\n"
 
-# 5. Atalhos nativos com [[bindings]] e action = { spawn = "..." }
-custom_bindings = """
-# --- Atalhos Personalizados Fedora Noctalia ---
-[[bindings]]
-keys = ["XF86AudioRaiseVolume"]
-action = { spawn = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+" }
-
-[[bindings]]
-keys = ["XF86AudioLowerVolume"]
-action = { spawn = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-" }
-
-[[bindings]]
-keys = ["XF86AudioMute"]
-action = { spawn = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" }
-
-[[bindings]]
-keys = ["XF86MonBrightnessUp"]
-action = { spawn = "brightnessctl set 5%+" }
-
-[[bindings]]
-keys = ["XF86MonBrightnessDown"]
-action = { spawn = "brightnessctl set 5%-" }
-
-[[bindings]]
-keys = ["Print"]
-action = { spawn = 'grim -g "$(slurp)" - | wl-copy' }
-
-[[bindings]]
-keys = ["Mod4", "l"]
-action = { spawn = "swaylock -c 000000" }
+# 5. Atalhos nativos antes da seção [layout]
+custom_shortcuts_block = """
+# ------------------------------------------------------------------------------
+# Atalhos Personalizados Fedora Noctalia (Multimídia, Brilho, Print e Bloqueio)
+# ------------------------------------------------------------------------------
+"XF86AudioRaiseVolume" = "spawn:wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
+"XF86AudioLowerVolume" = "spawn:wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+"XF86AudioMute" = "spawn:wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+"XF86AudioPlay" = "spawn:playerctl play-pause"
+"XF86AudioNext" = "spawn:playerctl next"
+"XF86AudioPrev" = "spawn:playerctl previous"
+"XF86MonBrightnessUp" = "spawn:brightnessctl set 5%+"
+"XF86MonBrightnessDown" = "spawn:brightnessctl set 5%-"
+"Print" = 'spawn:grim -g "$(slurp)" - | wl-copy'
+"Mod+L" = "spawn:swaylock -c 000000"
 """
 
-content = content.rstrip() + "\n" + custom_bindings
+layout_pattern = re.compile(r'(?=\n\s*(?:#\s*[-=]+\s*Layout\s*[-=]*\s*\n|\[layout\]))', re.IGNORECASE)
+if layout_pattern.search(content):
+    content = layout_pattern.sub(custom_shortcuts_block + "\n", content, count=1)
+elif "[keybinds]" in content:
+    content = re.sub(r'(\[keybinds\][^\n]*\n)', r'\1' + custom_shortcuts_block + '\n', content, count=1)
+else:
+    content = content.rstrip() + "\n" + custom_shortcuts_block + "\n"
 
 if tomllib:
     tomllib.loads(content)
