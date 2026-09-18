@@ -104,6 +104,7 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `gnome-disk-utility` | **Gerenciador de Discos:** Utilitário visual para formatar pendrives, criar partições e gravar arquivos `.iso`. |
 | `swaylock` | **Bloqueador de Tela Wayland:** Bloqueia a sessão de forma segura usando o protocolo oficial `ext-session-lock-v1`. |
 | `grim`, `slurp`, `wl-clipboard` | **Captura de Tela:** O trio definitivo do Wayland. O `grim` captura a imagem, o `slurp` permite arrastar e selecionar uma área, e o `wl-clipboard` copia para a memória para colar direto no navegador/chat. |
+| `playerctl` | **Controle Multimídia (MPRIS):** Utilitário de linha de comando para controlar reprodutores de áudio e vídeo (Spotify, navegadores, Celluloid) através das teclas Play/Pause, Próxima e Anterior. |
 | `adwaita-icon-theme` | **Ícones do Sistema:** Pacote oficial que evita ícones quebrados ou invisíveis nas pastas do Nautilus. |
 | `google-noto-*-fonts` | **Tipografia Completa:** Famílias Noto Sans, Serif, CJK (caracteres asiáticos) e Color Emoji para evitar blocos vazios na web. |
 | `glycin-thumbnailer` | **Miniaturas em Sandbox:** Gera miniaturas seguras de imagens WebP, AVIF, SVG, JPEG-XL no Nautilus. |
@@ -154,10 +155,10 @@ O script deve apresentar uma interface em linha de comando elegante, padronizada
 ### 3.1 Mockup da Interface Principal
 
 ```text
-  ██████╗ ███████╗██████╗  ██████╗ ██████╗  █████╗ 
-  ██╔══██╗██╔════╝██╔══██╗██╔═══██╗██╔══██╗██╔══██╗
-  ██████╔╝█████╗  ██║  ██║██║   ██║██████╔╝███████║
-  ██╔═══╝ ██╔══╝  ██║  ██║██║   ██║██╔══██╗██╔══██║
+  ███████╗███████╗██████╗  ██████╗ ██████╗  █████╗ 
+  ██╔════╝██╔════╝██╔══██╗██╔═══██╗██╔══██╗██╔══██╗
+  █████╗  █████╗  ██║  ██║██║   ██║██████╔╝███████║
+  ██╔══╝  ██╔══╝  ██║  ██║██║   ██║██╔══██╗██╔══██║
   ██║     ███████╗██████╔╝╚██████╔╝██║  ██║██║  ██║
   ╚═╝     ╚══════╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
   ── Umbriel + Noctalia Shell + Noctalia Greeter ──
@@ -374,28 +375,26 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 
 ### Módulo 05: Aplicações de Usuário e Multimídia (`05_desktop_apps.sh`)
 
-1. Instalar os programas de uso diário aprovados:
+1. **Substituição Limpa do FFmpeg (Prevenção de Conflitos de Biblioteca):**
+   * Realizar o swap antes de instalar os pacotes para evitar travamentos do DNF com `libswresample-free`:
+     ```bash
+     sudo dnf swap -y --allowerasing ffmpeg-free ffmpeg
+     ```
+   * Utilizar a flag `--allowerasing` nas chamadas do DNF deste módulo.
 
-   * `kitty`, `nautilus`, `loupe`, `evince`, `gnome-text-editor`, `file-roller`, `file-roller-nautilus`, `celluloid`, `simple-scan`, `gnome-disk-utility`.
-
-   * Captura de tela: `grim`, `slurp`, `wl-clipboard`.
-
-   * Arquivos compactados: `7zip`, `unrar`, `zstd`, `tar`, `xz`, `unzip`.
-
+2. **Instalar os programas de uso diário aprovados:**
+   * Produtividade: `kitty`, `nautilus`, `loupe`, `evince`, `gnome-text-editor`, `file-roller`, `file-roller-nautilus`, `celluloid`, `simple-scan`, `gnome-disk-utility`.
+   * Captura de tela e controle multimídia: `grim`, `slurp`, `wl-clipboard`, `playerctl`.
+   * Arquivos compactados: `p7zip`, `p7zip-plugins`, `unrar`, `zstd`, `tar`, `xz`, `unzip`.
    * Miniaturas: `glycin-thumbnailer`, `ffmpegthumbnailer`, `evince-thumbnailer`.
-
    * Fontes e Ícones: `adwaita-icon-theme`, `google-noto-sans-fonts`, `google-noto-serif-fonts`, `google-noto-sans-cjk-fonts`, `google-noto-color-emoji-fonts`.
 
-2. **Instalação do Brave Origin (com contingência):**
-
-   * Tentar via DNF: `sudo dnf install -y brave-origin`
-
+3. **Instalação do Brave Origin (com contingência):**
+   * Tentar via DNF: `sudo dnf install -y --allowerasing brave-origin`
    * Se retornar erro: executar `curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh`
 
-3. **Criação da WebApp do Flathub (0 MB RAM em background):**
-
+4. **Criação da WebApp do Flathub (0 MB RAM em background):**
    * Criar o arquivo `/usr/share/applications/flathub-store.desktop`:
-
      ```ini
      [Desktop Entry]
      Name=Loja de Aplicativos (Flathub)
@@ -411,67 +410,78 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 
 ### Módulo 06: Pós-Instalação, Atalhos e Ajustes Finais (`06_post_install.sh`)
 
-1. **Configuração do Arquivo do Umbriel (`~/.config/umbriel/config.toml`):**
-
-   * Criar o diretório `mkdir -p ~/.config/umbriel`.
-
-   * Copiar a base do sistema: `cp /usr/share/umbriel/config.toml ~/.config/umbriel/config.toml`.
-
-   * **Injetar Autostart Obrigatório:**
-
-     * **Se Máquina Física:**
-
-       ```toml
-       [general]
-       autostart = [
-           "noctalia",
-           "/usr/libexec/polkit-mate-authentication-agent-1"
-       ]
-       ```
-
-     * **Se Máquina Virtual (Ajustes de Renderização e Cursor):**
-
-       ```toml
-       [general]
-       autostart = [
-           "env LIBGL_ALWAYS_SOFTWARE=1 noctalia",
-           "/usr/libexec/polkit-mate-authentication-agent-1"
-       ]
-       [input.cursor]
-       hardware_cursor = false
-       ```
-
-   * **Injetar Layout ABNT2 (Se selecionado pelo usuário no menu):**
-
-     ```toml
-     [input.keyboard]
-     xkb_layout = "br"
+1. **Pré-criação do Chaveiro GNOME Keyring (Sem Diálogos Pop-up):**
+   * Criar o ponteiro do chaveiro padrão antes do primeiro login gráfico:
+     ```bash
+     KEYRINGS_DIR="${REAL_HOME}/.local/share/keyrings"
+     sudo -u "${REAL_USER}" mkdir -p "${KEYRINGS_DIR}"
+     echo "login" | sudo -u "${REAL_USER}" tee "${KEYRINGS_DIR}/default" >/dev/null
+     sudo chmod 700 "${KEYRINGS_DIR}"
+     sudo chmod 600 "${KEYRINGS_DIR}/default"
      ```
 
-   * **Injetar Atalhos de Teclado Essenciais:**
+2. **Configuração Base Oficial do Umbriel (`~/.config/umbriel/config.toml`):**
+   * Copiar obrigatoriamente a base oficial do sistema para preservar centenas de regras nativas de janelas/tiling:
+     ```bash
+     cp /usr/share/umbriel/config.toml ~/.config/umbriel/config.toml
+     ```
 
-     * Teclas de Volume: `wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+` / `5%-` / `wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle`
+3. **Injeção de Autostart e Hardware (Física vs. Máquina Virtual):**
+   * **Se Máquina Física:**
+     ```toml
+     [general]
+     autostart = [
+         "noctalia",
+         "/usr/libexec/polkit-mate-authentication-agent-1"
+     ]
+     ```
+   * **Se Máquina Virtual:**
+     ```toml
+     [general]
+     autostart = [
+         "env LIBGL_ALWAYS_SOFTWARE=1 noctalia",
+         "/usr/libexec/polkit-mate-authentication-agent-1"
+     ]
 
-     * Teclas de Brilho: `brightnessctl set 5%+` / `5%-`
+     [input.cursor]
+     hardware_cursor = false
+     ```
 
-     * Tecla PrintScreen: `grim -g "$(slurp)" - | wl-copy` (copia a seleção direto para o clipboard)
+4. **Injeção de Layout ABNT2 (Se selecionado pelo usuário no menu):**
+   ```toml
+   [input.keyboard]
+   layout = "br"
+   ```
 
-     * Tecla Bloquear Tela (`Mod+L`): `swaylock -c 000000`
+5. **Injeção de Atalhos sob `[keybinds]` antes da Seção `[layout]`:**
+   * Os atalhos personalizados devem ser inseridos imediatamente **antes da seção `[layout]`** (~linha 482 do arquivo base) usando a sintaxe nativa direta `"TECLA" = "spawn:COMANDO"`:
+     ```toml
+     # ------------------------------------------------------------------------------
+     # Atalhos Personalizados Fedora Noctalia (Multimídia, Brilho, Print e Bloqueio)
+     # ------------------------------------------------------------------------------
+     "XF86AudioRaiseVolume" = "spawn:wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
+     "XF86AudioLowerVolume" = "spawn:wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+     "XF86AudioMute" = "spawn:wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+     "XF86AudioPlay" = "spawn:playerctl play-pause"
+     "XF86AudioNext" = "spawn:playerctl next"
+     "XF86AudioPrev" = "spawn:playerctl previous"
+     "XF86MonBrightnessUp" = "spawn:brightnessctl set 5%+"
+     "XF86MonBrightnessDown" = "spawn:brightnessctl set 5%-"
+     "Print" = 'spawn:grim -g "$(slurp)" - | wl-copy'
+     "Mod+L" = "spawn:swaylock -c 000000"
+     ```
+   * **Proteção de Heredoc:** Ao gerar ou modificar o arquivo via Python/Bash, utilizar heredoc com aspas (`<<'PYEOF'`) e aspas simples no comando do PrintScreen (`'spawn:grim -g "$(slurp)" - | wl-copy'`) para evitar expansão prematura da variável `$(slurp)` pelo shell.
 
-2. **Renomear a Sessão no Display Manager para "Noctalia":**
-
+6. **Renomear a Sessão no Display Manager para "Noctalia":**
    * Editar `/usr/share/wayland-sessions/umbriel.desktop` e definir `Name=Noctalia`.
 
-3. **Criação das Pastas Padrões:**
+7. **Criação das Pastas Padrões:**
+   * Executar `sudo -u "$REAL_USER" xdg-user-dirs-update`.
 
-   * Executar `xdg-user-dirs-update`.
-
-4. **Compilação da NVIDIA (Apenas se instalado na máquina física):**
-
+8. **Compilação da NVIDIA (Apenas se instalado na máquina física):**
    * Rodar `sudo akmods --force` para garantir que o binário `.ko` seja construído antes do reboot.
 
-5. **Definição de Alvo Gráfico e Substituição do GDM:**
-
+9. **Definição de Alvo Gráfico e Substituição do GDM:**
    ```bash
    sudo systemctl disable gdm 2>/dev/null || true
    sudo systemctl enable greetd.service
@@ -485,13 +495,9 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 A IA que escrever o script deve fornecer testes internos de integridade que validem os seguintes itens antes de permitir o reboot:
 
 - [ ] **Validação do Greetd:** Testar se o arquivo `/etc/greetd/config.toml` foi escrito com `user = "greetd"` e verificar se o binário apontado no `command` existe no disco.
-
 - [ ] **Validação do Polkit:** Confirmar que `/usr/libexec/polkit-mate-authentication-agent-1` existe no caminho correto.
-
-- [ ] **Validação do Umbriel:** Checar a sintaxe TOML de `~/.config/umbriel/config.toml`.
-
-- [ ] **Validação de Permissões:** Garantir que o diretório `~/.config/umbriel` pertença ao usuário real (`chown -R $USER:$USER`), e não ao `root`.
-
+- [ ] **Validação do Umbriel:** Checar a sintaxe TOML de `~/.config/umbriel/config.toml` com `tomllib.loads()`.
+- [ ] **Validação de Permissões:** Garantir que os diretórios `~/.config` e `~/.local` pertençam ao usuário real (`chown -R $USER:$USER`), e não ao `root`.
 - [ ] **Validação de Driver na VM:** Assegurar que nenhuma tentativa de compilar `akmod-nvidia` seja disparada se a opção "Máquina Virtual" foi a escolhida.
 
 ---
@@ -501,17 +507,29 @@ A IA que escrever o script deve fornecer testes internos de integridade que vali
 O script ou o arquivo `README.md` gerado deve incluir a seguinte seção explicativa:
 
 > ### 📌 Nota para Instalação em Máquinas Virtuais (VMware / VirtualBox)
-
 > Se você optar por testar esta instalação a partir da mídia **Fedora Everything Netinstall** dentro de uma Máquina Virtual:
-
 > * Na tela de seleção de pacotes do Anaconda, **marque a opção `Guest Agents`**.
-
 > * **Por que isso é necessário?** O pacote instala o `open-vm-tools` (para VMware) ou módulos de integração do VirtualBox, garantindo:
-
 >   1. Redimensionamento automático da resolução ao maximizar a janela.
-
 >   2. Compartilhamento fluido da área de transferência (Copiar e Colar entre o hospedeiro e a VM).
-
 >   3. Captura e liberação perfeita do ponteiro do mouse sem travamentos na janela.
-
 > *(Em instalações físicas em notebooks ou desktops reais, mantenha `Guest Agents` desmarcado).*
+
+---
+
+## 8. CASOS DE BORDA E ARMADILHAS EVITADAS (SOLUÇÕES VALIDADAS EM TESTE)
+
+Abaixo está o registro técnico consolidado de todos os comportamentos inesperados identificados em testes reais e as soluções definitivas integradas:
+
+| Armadilha / Desafio Técnico | Causa Raiz Identificada | Solução Arquitetural Validada |
+| :--- | :--- | :--- |
+| **`playerctl` ausente** | Teclas multimídia Play/Pause, Next e Prev não funcionavam por falta de daemon MPRIS CLI. | Adicionado o pacote `playerctl` em `config/packages-apps.conf`. |
+| **Atalhos do Umbriel** | Uso de sintaxe inválida (`[[bindings]]` com dicionários) que gerava avisos de chave desconhecida. | Injeção sob `[keybinds]` com a sintaxe `"TECLA" = "spawn:CMD"` imediatamente antes da seção `[layout]`. |
+| **Bash Heredoc no PrintScreen** | O shell interpretava `$(slurp)` durante a execução do script e gravava comando vazio no TOML. | Uso estrito de heredoc Python com aspas (`<<'PYEOF'`) e aspas simples literais no comando do PrintScreen. |
+| **Conflito FFmpeg** | DNF abortava devido a conflito entre `libswresample-free` da base e pacotes irrestritos do RPM Fusion. | Execução de `dnf swap -y --allowerasing ffmpeg-free ffmpeg` e uso da flag `--allowerasing`. |
+| **Flatpak Polkit Prompt** | Chamada do Flatpak sem privilégios disparava pedido interativo de senha no terminal (`org.freedesktop.Flatpak.configure-remote`). | Execução com `sudo flatpak remote-add --if-not-exists flathub ...`. |
+| **Idempotência do Repositório Terra** | Reexecução do módulo tentava recriar repositório com o mesmo ID gerando erro no DNF5. | Verificação de segurança prévia com `if ! rpm -q terra-release &>/dev/null && [ ! -f /etc/yum.repos.d/terra.repo ]`. |
+| **Escopo de Variáveis (`IS_VM`)** | Execução de `source config/settings.conf` dentro dos módulos resetava variáveis exportadas pelo `setup.sh`. | Uso de `export` explícito no `setup.sh` e expansão padrão `: "${IS_VM:=false}"` no `settings.conf`. |
+| **Isolamento de Máquina Virtual** | Módulo de GPU tentava configurar `switcheroo-control` e VA-API dedicados na VM. | Saída antecipada limpa (`return 0`) no início de `02_gpu_drivers.sh` quando `IS_VM=true`. |
+| **Display Manager em VM (Greetd)** | Usuário `greetd` não possuía acesso ao hardware de vídeo resultando em tela preta no boot. | Atribuição dos grupos `video,render,input` ao usuário `greetd` e flags de renderização por software (`LIBGL_ALWAYS_SOFTWARE=1`). |
+| **Chaveiro GNOME Keyring** | Diálogo "Choose password for new keyring" exibido no primeiro boot. | Inicialização prévia de `${REAL_HOME}/.local/share/keyrings/default` apontando para `login` com permissão `700/600`. |
