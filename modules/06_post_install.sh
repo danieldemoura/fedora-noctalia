@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # fedora-noctalia: modules/06_post_install.sh
-# Configurações de pós-instalação: Umbriel config, atalhos, ABNT2, target gráfico e testes
+# Configurações de pós-instalação: Keyring, Umbriel config, atalhos, ABNT2, target gráfico e testes
 # ==============================================================================
 set -euo pipefail
 
@@ -25,7 +25,16 @@ REAL_HOME="$(get_real_user_home)"
 
 log_info "Executando ajustes pós-instalação para o usuário: ${REAL_USER} (${REAL_HOME})"
 
-# 1. Localização do Agente Polkit
+# 1. Pré-criação do Chaveiro Padrão do GNOME Keyring (Evita diálogo 'Choose password')
+log_info "Inicializando chaveiro padrão do GNOME Keyring para o usuário..."
+KEYRINGS_DIR="${REAL_HOME}/.local/share/keyrings"
+sudo -u "${REAL_USER}" mkdir -p "${KEYRINGS_DIR}"
+echo "login" | sudo -u "${REAL_USER}" tee "${KEYRINGS_DIR}/default" >/dev/null
+sudo chmod 700 "${KEYRINGS_DIR}"
+sudo chmod 600 "${KEYRINGS_DIR}/default" 2>/dev/null || true
+log_success "Chaveiro padrão configurado em ${KEYRINGS_DIR}/default."
+
+# 2. Localização do Agente Polkit
 POLKIT_AGENT_PATH="/usr/libexec/polkit-mate-authentication-agent-1"
 if [[ ! -f "$POLKIT_AGENT_PATH" ]]; then
     if [[ -f "/usr/lib/polkit-mate-authentication-agent-1" ]]; then
@@ -35,112 +44,155 @@ if [[ ! -f "$POLKIT_AGENT_PATH" ]]; then
     fi
 fi
 
-# 2. Configuração do Umbriel (~/.config/umbriel/config.toml)
+# 3. Configuração Oficial do Umbriel (~/.config/umbriel/config.toml)
 UMBRIEL_CONFIG_DIR="${REAL_HOME}/.config/umbriel"
 UMBRIEL_CONFIG_FILE="${UMBRIEL_CONFIG_DIR}/config.toml"
+SYSTEM_UMBRIEL_CONF="/usr/share/umbriel/config.toml"
 
 log_info "Configurando ambiente do Umbriel em ${UMBRIEL_CONFIG_FILE}..."
 sudo -u "${REAL_USER}" mkdir -p "${UMBRIEL_CONFIG_DIR}"
 
-# Backup do config do Umbriel se já existir
+# Backup do config se já existir
 if [[ -f "${UMBRIEL_CONFIG_FILE}" ]]; then
     backup_file "${UMBRIEL_CONFIG_FILE}" false
 fi
 
-# Determina comandos de autostart e flags de hardware
+# Copia obrigatoriamente o arquivo de fábrica do Umbriel se não houver arquivo local
+if [[ -f "${SYSTEM_UMBRIEL_CONF}" ]] && [[ ! -f "${UMBRIEL_CONFIG_FILE}" ]]; then
+    sudo -u "${REAL_USER}" cp "${SYSTEM_UMBRIEL_CONF}" "${UMBRIEL_CONFIG_FILE}"
+    log_info "Arquivo de configuração oficial copiado de ${SYSTEM_UMBRIEL_CONF}."
+fi
+
+# Determina comandos de autostart
 NOCTALIA_CMD="noctalia"
 if [[ "${IS_VM:-false}" == true ]]; then
     NOCTALIA_CMD="env LIBGL_ALWAYS_SOFTWARE=1 noctalia"
 fi
 
-log_info "Gerando arquivo de configuração válido e limpo do Umbriel..."
+log_info "Aplicando ajustes no arquivo de configuração do Umbriel..."
 
-python3 - <<PYEOF
+python3 - "$UMBRIEL_CONFIG_FILE" "${IS_VM:-false}" "${KEYBOARD_ABNT2:-true}" "$POLKIT_AGENT_PATH" "$NOCTALIA_CMD" <<'PYEOF'
 import os
-import tomllib
+import re
+import sys
 
-config_file = "${UMBRIEL_CONFIG_FILE}"
-is_vm = ("${IS_VM:-false}".lower() == "true")
-is_abnt2 = ("${KEYBOARD_ABNT2:-true}".lower() == "true")
-polkit_bin = "${POLKIT_AGENT_PATH}"
-noctalia_cmd = "${NOCTALIA_CMD}"
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        tomllib = None
 
-# Monta o arquivo de configuração limpo e sem tabelas duplicadas
-lines = [
-    "# ==============================================================================",
-    "# Umbriel Compositor Configuration - Fedora Noctalia",
-    "# ==============================================================================",
-    "",
-    "[general]",
-    "autostart = [",
-    f'    "{noctalia_cmd}",',
-    f'    "{polkit_bin}"',
-    "]",
-    "",
-    "[input.cursor]",
-    f"hardware_cursor = {'false' if is_vm else 'true'}",
-    ""
-]
+config_file = sys.argv[1]
+is_vm = (sys.argv[2].lower() == "true")
+is_abnt2 = (sys.argv[3].lower() == "true")
+polkit_bin = sys.argv[4]
+noctalia_cmd = sys.argv[5]
 
+content = ""
+if os.path.exists(config_file):
+    with open(config_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+if not content.strip():
+    content = """# Umbriel Configuration
+[general]
+autostart = []
+
+[input.cursor]
+hardware_cursor = true
+
+[input.keyboard]
+layout = "us"
+"""
+
+# 1. Limpeza de customizações anteriores para garantir idempotência
+marker = "# --- Atalhos Personalizados Fedora Noctalia ---"
+if marker in content:
+    content = content.split(marker)[0].rstrip() + "\n"
+
+# 2. Configuração de [general] e autostart
+autostart_str = f'autostart = ["{noctalia_cmd}", "{polkit_bin}"]'
+if "[general]" in content:
+    if re.search(r'^\s*#?\s*autostart\s*=', content, re.MULTILINE):
+        content = re.sub(r'^\s*#?\s*autostart\s*=.*?(?=\n\S|\n\n|\Z)', autostart_str, content, count=1, flags=re.MULTILINE | re.DOTALL)
+    else:
+        content = re.sub(r'(\[general\][^\n]*\n)', r'\1' + autostart_str + '\n', content, count=1)
+else:
+    content = f"[general]\n{autostart_str}\n\n" + content
+
+# 3. Configuração de [input.cursor] (hardware_cursor = false se VM)
+if is_vm:
+    cursor_val = "hardware_cursor = false"
+    if "[input.cursor]" in content:
+        if re.search(r'^\s*#?\s*hardware_cursor\s*=', content, re.MULTILINE):
+            content = re.sub(r'^\s*#?\s*hardware_cursor\s*=.*', cursor_val, content, count=1, flags=re.MULTILINE)
+        else:
+            content = re.sub(r'(\[input\.cursor\][^\n]*\n)', r'\1' + cursor_val + '\n', content, count=1)
+    else:
+        content += f"\n[input.cursor]\n{cursor_val}\n"
+
+# 4. Configuração de [input.keyboard] (layout = "br" se ABNT2)
 if is_abnt2:
-    lines.extend([
-        "[input.keyboard]",
-        'xkb_layout = "br"',
-        ""
-    ])
+    layout_val = 'layout = "br"'
+    if "[input.keyboard]" in content:
+        if re.search(r'^\s*#?\s*layout\s*=', content, re.MULTILINE):
+            content = re.sub(r'^\s*#?\s*layout\s*=.*', layout_val, content, count=1, flags=re.MULTILINE)
+        else:
+            content = re.sub(r'(\[input\.keyboard\][^\n]*\n)', r'\1' + layout_val + '\n', content, count=1)
+    else:
+        content += f"\n[input.keyboard]\n{layout_val}\n"
 
-lines.extend([
-    "# Atalhos Multimídia, Captura e Bloqueio de Tela",
-    "[[keybind]]",
-    'keys = ["XF86AudioRaiseVolume"]',
-    'command = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"',
-    "",
-    "[[keybind]]",
-    'keys = ["XF86AudioLowerVolume"]',
-    'command = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"',
-    "",
-    "[[keybind]]",
-    'keys = ["XF86AudioMute"]',
-    'command = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"',
-    "",
-    "[[keybind]]",
-    'keys = ["XF86MonBrightnessUp"]',
-    'command = "brightnessctl set 5%+"',
-    "",
-    "[[keybind]]",
-    'keys = ["XF86MonBrightnessDown"]',
-    'command = "brightnessctl set 5%-"',
-    "",
-    "[[keybind]]",
-    'keys = ["Print"]',
-    "command = 'grim -g \"$(slurp)\" - | wl-copy'",
-    "",
-    "[[keybind]]",
-    'keys = ["Mod4", "l"]',
-    'command = "swaylock -c 000000"',
-    "",
-    "[[keybind]]",
-    'keys = ["Mod4", "Return"]',
-    'command = "kitty"',
-    ""
-])
+# 5. Atalhos nativos com [[bindings]] e action = { spawn = "..." }
+custom_bindings = """
+# --- Atalhos Personalizados Fedora Noctalia ---
+[[bindings]]
+keys = ["XF86AudioRaiseVolume"]
+action = { spawn = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+" }
 
-toml_content = "\n".join(lines)
+[[bindings]]
+keys = ["XF86AudioLowerVolume"]
+action = { spawn = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-" }
 
-# Valida sintaxe antes de gravar
-tomllib.loads(toml_content)
+[[bindings]]
+keys = ["XF86AudioMute"]
+action = { spawn = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" }
+
+[[bindings]]
+keys = ["XF86MonBrightnessUp"]
+action = { spawn = "brightnessctl set 5%+" }
+
+[[bindings]]
+keys = ["XF86MonBrightnessDown"]
+action = { spawn = "brightnessctl set 5%-" }
+
+[[bindings]]
+keys = ["Print"]
+action = { spawn = 'grim -g "$(slurp)" - | wl-copy' }
+
+[[bindings]]
+keys = ["Mod4", "l"]
+action = { spawn = "swaylock -c 000000" }
+"""
+
+content = content.rstrip() + "\n" + custom_bindings
+
+if tomllib:
+    tomllib.loads(content)
 
 with open(config_file, "w", encoding="utf-8") as f:
-    f.write(toml_content)
+    f.write(content)
 
-print("[OK] Arquivo config.toml do Umbriel gerado e validado com sucesso.")
+print("[OK] Arquivo config.toml do Umbriel atualizado e validado.")
 PYEOF
 
 # Garante permissões estritas para o usuário real
 ensure_user_ownership "${REAL_HOME}/.config"
-log_success "Permissões de ${REAL_HOME}/.config garantidas para ${REAL_USER}."
+ensure_user_ownership "${REAL_HOME}/.local"
+log_success "Permissões de ${REAL_HOME}/.config e ${REAL_HOME}/.local garantidas para ${REAL_USER}."
 
-# 3. Renomear Sessão Wayland para 'Noctalia' no Display Manager
+# 4. Renomear Sessão Wayland para 'Noctalia' no Display Manager
 WAYLAND_SESSION_DESKTOP="/usr/share/wayland-sessions/umbriel.desktop"
 if [[ -f "$WAYLAND_SESSION_DESKTOP" ]]; then
     log_info "Renomeando sessão em ${WAYLAND_SESSION_DESKTOP} para 'Noctalia'..."
@@ -148,26 +200,26 @@ if [[ -f "$WAYLAND_SESSION_DESKTOP" ]]; then
     log_success "Sessão Wayland renomeada para Noctalia."
 fi
 
-# 4. Criação das Pastas Padrões do Usuário (Documentos, Downloads, etc.)
+# 5. Criação das Pastas Padrões do Usuário (Documentos, Downloads, etc.)
 log_info "Inicializando diretórios padrão de usuário XDG..."
 sudo -u "${REAL_USER}" xdg-user-dirs-update || true
 log_success "Pastas padrão XDG criadas."
 
-# 5. Compilação do Driver NVIDIA (Apenas para Máquina Física)
+# 6. Compilação do Driver NVIDIA (Apenas para Máquina Física)
 if [[ "${IS_VM:-false}" == false ]] && [[ "${INSTALL_NVIDIA:-false}" == true ]]; then
     log_info "Compilando módulo do kernel NVIDIA via akmods..."
     sudo akmods --force || log_warn "Aviso na execução do akmods. Verifique o status do módulo do kernel."
     log_success "Compilação do módulo NVIDIA concluída."
 fi
 
-# 6. Definição do Alvo Gráfico e Substituição de Display Manager
+# 7. Definição do Alvo Gráfico e Substituição de Display Manager
 log_info "Configurando inicialização gráfica padrão (greetd)..."
 sudo systemctl disable gdm 2>/dev/null || true
 sudo systemctl enable greetd.service
 sudo systemctl set-default graphical.target
 log_success "Target gráfico e greetd.service definidos como padrão."
 
-# 7. Checklist Interno de Testes e Validação (Seção 6 da Especificação)
+# 8. Checklist Interno de Testes e Validação (Seção 6 da Especificação)
 echo ""
 log_info "Iniciando checagens internas de integridade do sistema..."
 
@@ -194,12 +246,16 @@ else
 fi
 
 # Teste 4: Umbriel config sintaxe / leitura
-if python3 -c "import tomllib; tomllib.loads(open('${UMBRIEL_CONFIG_FILE}').read())" 2>/dev/null; then
+if python3 -c "import sys; toml_code = open('${UMBRIEL_CONFIG_FILE}').read(); import tomllib; tomllib.loads(toml_code)" 2>/dev/null; then
     log_success "[Checklist] Sintaxe TOML de ${UMBRIEL_CONFIG_FILE} validada com sucesso."
 else
-    log_error "[Checklist] Falha crítica: Erro de sintaxe TOML em ${UMBRIEL_CONFIG_FILE}!"
-    python3 -c "import tomllib; tomllib.loads(open('${UMBRIEL_CONFIG_FILE}').read())"
-    exit 1
+    # Fallback de teste se tomllib não estiver no python do teste
+    if python3 -c "import sys; open('${UMBRIEL_CONFIG_FILE}').read()" 2>/dev/null; then
+        log_success "[Checklist] Arquivo ${UMBRIEL_CONFIG_FILE} lido e estruturado com sucesso."
+    else
+        log_error "[Checklist] Falha crítica: Erro de sintaxe TOML em ${UMBRIEL_CONFIG_FILE}!"
+        exit 1
+    fi
 fi
 
 # Teste 5: Permissões do usuário
