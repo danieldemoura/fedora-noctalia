@@ -37,7 +37,7 @@ fedora-noctalia-installer/
 │   ├── 03_compositor_shell.sh       # Umbriel, Noctalia Shell, Xwayland-satellite e Portais
 │   ├── 04_gpu_drivers.sh            # Drivers gráficos (Mesa livre ou NVIDIA se solicitado)
 │   ├── 05_desktop_apps.sh           # Apps de uso diário, codecs multimídia e fontes
-│   └── 06_post_install.sh           # Configuração de autostart, atalhos, ABNT2 e targets do systemd
+│   └── 06_post_install.sh           # Autostart, cursor na VM, layout ABNT2, target gráfico e validações
 └── templates/
     ├── greetd.toml.template         # Template de configuração do /etc/greetd/config.toml
     ├── pam_greetd.template          # Bloco do pam_gnome_keyring.so para o PAM
@@ -408,7 +408,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 
 ---
 
-### Módulo 06: Pós-Instalação, Atalhos e Ajustes Finais (`06_post_install.sh`)
+### Módulo 06: Pós-Instalação, Ajustes do Umbriel e Validações (`06_post_install.sh`)
 
 1. **Pré-criação do Chaveiro GNOME Keyring (Sem Diálogos Pop-up):**
    * Criar o ponteiro do chaveiro padrão antes do primeiro login gráfico:
@@ -420,57 +420,43 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
      sudo chmod 600 "${KEYRINGS_DIR}/default"
      ```
 
-2. **Configuração Base Oficial do Umbriel (`~/.config/umbriel/config.toml`):**
-   * Copiar obrigatoriamente a base oficial do sistema para preservar centenas de regras nativas de janelas/tiling:
+2. **Cópia da Configuração Oficial do Umbriel (`~/.config/umbriel/config.toml`):**
+   * Copiar diretamente a base oficial do sistema (`/usr/share/umbriel/config.toml`) para o diretório do usuário:
      ```bash
      cp /usr/share/umbriel/config.toml ~/.config/umbriel/config.toml
      ```
 
-3. **Injeção de Autostart e Hardware (Física vs. Máquina Virtual):**
-   * **Se Máquina Física:**
-     ```toml
-     [general]
-     autostart = [
-         "noctalia",
-         "/usr/libexec/polkit-mate-authentication-agent-1"
-     ]
-     ```
-   * **Se Máquina Virtual:**
-     ```toml
-     [general]
-     autostart = [
-         "env LIBGL_ALWAYS_SOFTWARE=1 noctalia",
-         "/usr/libexec/polkit-mate-authentication-agent-1"
-     ]
+3. **Ajustes Estritamente Necessários no TOML:**
+   * **Autostart (`[general]`):**
+     * **Máquina Física:**
+       ```toml
+       [general]
+       autostart = [
+           "noctalia",
+           "/usr/libexec/polkit-mate-authentication-agent-1"
+       ]
+       ```
+     * **Máquina Virtual:**
+       ```toml
+       [general]
+       autostart = [
+           "env LIBGL_ALWAYS_SOFTWARE=1 noctalia",
+           "/usr/libexec/polkit-mate-authentication-agent-1"
+       ]
+       ```
+   * **Cursor na VM (`[input.cursor]`):**
+     * Se `IS_VM=true`: definir `hardware_cursor = false`.
+   * **Teclado Brasileiro (`[input.keyboard]`):**
+     * Se `KEYBOARD_ABNT2=true`: definir `layout = "br"`.
 
-     [input.cursor]
-     hardware_cursor = false
-     ```
+4. **Decisão de Design Limpa: Preservação de Atalhos Nativos (Zero Injeção Extra):**
+   * O arquivo oficial `/usr/share/umbriel/config.toml` já vem de fábrica configurado com todos os atalhos essenciais do gerenciador (como `Mod+Return` para abrir o Kitty, `Mod+Q` para fechar janelas, atalhos de layout e workspaces).
+   * O controle de volume, brilho, conexões de rede e energia é gerenciado de forma visual e nativa pelo **Noctalia Shell**.
+   * O instalador **não injeta nenhum atalho de teclado extra sob `[keybinds]`**, eliminando completamente qualquer risco de conflitos de teclas, corrupção de formatação ou erros de parsing no compositor.
 
-4. **Injeção de Layout ABNT2 (Se selecionado pelo usuário no menu):**
-   ```toml
-   [input.keyboard]
-   layout = "br"
-   ```
-
-5. **Injeção de Atalhos sob `[keybinds]` antes da Seção `[layout]`:**
-   * Os atalhos personalizados devem ser inseridos imediatamente **antes da seção `[layout]`** (~linha 482 do arquivo base) usando a sintaxe nativa direta `"TECLA" = "spawn:COMANDO"`:
-     ```toml
-     # ------------------------------------------------------------------------------
-     # Atalhos Personalizados Fedora Noctalia (Multimídia, Brilho, Print e Bloqueio)
-     # ------------------------------------------------------------------------------
-     "XF86AudioRaiseVolume" = "spawn:wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
-     "XF86AudioLowerVolume" = "spawn:wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
-     "XF86AudioMute" = "spawn:wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
-     "XF86AudioPlay" = "spawn:playerctl play-pause"
-     "XF86AudioNext" = "spawn:playerctl next"
-     "XF86AudioPrev" = "spawn:playerctl previous"
-     "XF86MonBrightnessUp" = "spawn:brightnessctl set 5%+"
-     "XF86MonBrightnessDown" = "spawn:brightnessctl set 5%-"
-     "Print" = 'spawn:grim -g "$(slurp)" - | wl-copy'
-     "Mod+L" = "spawn:swaylock -c 000000"
-     ```
-   * **Proteção de Heredoc:** Ao gerar ou modificar o arquivo via Python/Bash, utilizar heredoc com aspas (`<<'PYEOF'`) e aspas simples no comando do PrintScreen (`'spawn:grim -g "$(slurp)" - | wl-copy'`) para evitar expansão prematura da variável `$(slurp)` pelo shell.
+5. **Validação Estrita de Sintaxe e Permissões:**
+   * Validação do arquivo gerado em Python através de `tomllib.loads()`.
+   * Garantia de propriedade recursiva de `~/.config` e `~/.local` para o usuário real (`ensure_user_ownership`).
 
 6. **Renomear a Sessão no Display Manager para "Noctalia":**
    * Editar `/usr/share/wayland-sessions/umbriel.desktop` e definir `Name=Noctalia`.
@@ -524,8 +510,7 @@ Abaixo está o registro técnico consolidado de todos os comportamentos inespera
 | Armadilha / Desafio Técnico | Causa Raiz Identificada | Solução Arquitetural Validada |
 | :--- | :--- | :--- |
 | **`playerctl` ausente** | Teclas multimídia Play/Pause, Next e Prev não funcionavam por falta de daemon MPRIS CLI. | Adicionado o pacote `playerctl` em `config/packages-apps.conf`. |
-| **Atalhos do Umbriel** | Uso de sintaxe inválida (`[[bindings]]` com dicionários) que gerava avisos de chave desconhecida. | Injeção sob `[keybinds]` com a sintaxe `"TECLA" = "spawn:CMD"` imediatamente antes da seção `[layout]`. |
-| **Bash Heredoc no PrintScreen** | O shell interpretava `$(slurp)` durante a execução do script e gravava comando vazio no TOML. | Uso estrito de heredoc Python com aspas (`<<'PYEOF'`) e aspas simples literais no comando do PrintScreen. |
+| **Integridade do TOML do Umbriel** | Risco de colisões de atalhos e avisos de sintaxe ao tentar injetar atalhos personalizados no TOML. | Preservação integral do arquivo oficial `/usr/share/umbriel/config.toml` sem injeção de atalhos extras, ajustando apenas autostart, cursor e ABNT2. |
 | **Conflito FFmpeg** | DNF abortava devido a conflito entre `libswresample-free` da base e pacotes irrestritos do RPM Fusion. | Execução de `dnf swap -y --allowerasing ffmpeg-free ffmpeg` e uso da flag `--allowerasing`. |
 | **Flatpak Polkit Prompt** | Chamada do Flatpak sem privilégios disparava pedido interativo de senha no terminal (`org.freedesktop.Flatpak.configure-remote`). | Execução com `sudo flatpak remote-add --if-not-exists flathub ...`. |
 | **Idempotência do Repositório Terra** | Reexecução do módulo tentava recriar repositório com o mesmo ID gerando erro no DNF5. | Verificação de segurança prévia com `if ! rpm -q terra-release &>/dev/null && [ ! -f /etc/yum.repos.d/terra.repo ]`. |

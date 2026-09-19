@@ -18,7 +18,7 @@ INSTALLER_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../lib/utils.sh
 [[ -f "${INSTALLER_ROOT}/lib/utils.sh" ]] && source "${INSTALLER_ROOT}/lib/utils.sh"
 
-ui_section_header "MÓDULO 06: PÓS-INSTALAÇÃO, ATALHOS E VALIDAÇÕES"
+ui_section_header "MÓDULO 06: PÓS-INSTALAÇÃO E VALIDAÇÕES"
 
 REAL_USER="$(get_real_user)"
 REAL_HOME="$(get_real_user_home)"
@@ -57,8 +57,8 @@ if [[ -f "${UMBRIEL_CONFIG_FILE}" ]]; then
     backup_file "${UMBRIEL_CONFIG_FILE}" false
 fi
 
-# Copia obrigatoriamente o arquivo de fábrica do Umbriel se não houver arquivo local
-if [[ -f "${SYSTEM_UMBRIEL_CONF}" ]] && [[ ! -f "${UMBRIEL_CONFIG_FILE}" ]]; then
+# Copia diretamente o arquivo de configuração oficial do Umbriel
+if [[ -f "${SYSTEM_UMBRIEL_CONF}" ]]; then
     sudo -u "${REAL_USER}" cp "${SYSTEM_UMBRIEL_CONF}" "${UMBRIEL_CONFIG_FILE}"
     log_info "Arquivo de configuração oficial copiado de ${SYSTEM_UMBRIEL_CONF}."
 fi
@@ -107,11 +107,11 @@ hardware_cursor = true
 layout = "us"
 """
 
-# 1. Limpeza de customizações anteriores para garantir idempotência
-marker_header = "# ------------------------------------------------------------------------------\n# Atalhos Personalizados Fedora Noctalia (Multimídia, Brilho, Print e Bloqueio)"
+# 1. Limpeza de customizações/atalhos anteriores para garantir idempotência
+marker_header = "# ------------------------------------------------------------------------------\n# Atalhos Personalizados Fedora Noctalia"
 if marker_header in content:
     content = re.sub(
-        r'# ------------------------------------------------------------------------------\s*\n# Atalhos Personalizados Fedora Noctalia \(Multimídia, Brilho, Print e Bloqueio\)\s*\n# ------------------------------------------------------------------------------\s*\n.*?(?=\n\s*(?:\[|#\s*[-=]+\s*Layout|\Z))',
+        r'# ------------------------------------------------------------------------------\s*\n# Atalhos Personalizados Fedora Noctalia.*?(?=\n\s*(?:\[|#\s*[-=]+\s*Layout|\Z))',
         '',
         content,
         flags=re.DOTALL
@@ -150,41 +150,26 @@ if is_abnt2:
             content = re.sub(r'^\s*#?\s*layout\s*=.*', layout_val, content, count=1, flags=re.MULTILINE)
         else:
             content = re.sub(r'(\[input\.keyboard\][^\n]*\n)', r'\1' + layout_val + '\n', content, count=1)
+    elif "[keyboard]" in content:
+        if re.search(r'^\s*#?\s*layout\s*=', content, re.MULTILINE):
+            content = re.sub(r'^\s*#?\s*layout\s*=.*', layout_val, content, count=1, flags=re.MULTILINE)
+        else:
+            content = re.sub(r'(\[keyboard\][^\n]*\n)', r'\1' + layout_val + '\n', content, count=1)
     else:
         content += f"\n[input.keyboard]\n{layout_val}\n"
 
-# 5. Atalhos nativos antes da seção [layout]
-custom_shortcuts_block = """
-# ------------------------------------------------------------------------------
-# Atalhos Personalizados Fedora Noctalia (Multimídia, Brilho, Print e Bloqueio)
-# ------------------------------------------------------------------------------
-"XF86AudioRaiseVolume" = "spawn:wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
-"XF86AudioLowerVolume" = "spawn:wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
-"XF86AudioMute" = "spawn:wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
-"XF86AudioPlay" = "spawn:playerctl play-pause"
-"XF86AudioNext" = "spawn:playerctl next"
-"XF86AudioPrev" = "spawn:playerctl previous"
-"XF86MonBrightnessUp" = "spawn:brightnessctl set 5%+"
-"XF86MonBrightnessDown" = "spawn:brightnessctl set 5%-"
-"Print" = 'spawn:grim -g "$(slurp)" - | wl-copy'
-"Mod+L" = "spawn:swaylock -c 000000"
-"""
-
-layout_pattern = re.compile(r'(?=\n\s*(?:#\s*[-=]+\s*Layout\s*[-=]*\s*\n|\[layout\]))', re.IGNORECASE)
-if layout_pattern.search(content):
-    content = layout_pattern.sub(custom_shortcuts_block + "\n", content, count=1)
-elif "[keybinds]" in content:
-    content = re.sub(r'(\[keybinds\][^\n]*\n)', r'\1' + custom_shortcuts_block + '\n', content, count=1)
-else:
-    content = content.rstrip() + "\n" + custom_shortcuts_block + "\n"
-
+# 5. Validação de sintaxe TOML
 if tomllib:
-    tomllib.loads(content)
+    try:
+        tomllib.loads(content)
+    except Exception as e:
+        print(f"[ERRO] Falha na validação do TOML de {config_file}: {e}", file=sys.stderr)
+        sys.exit(1)
 
 with open(config_file, "w", encoding="utf-8") as f:
     f.write(content)
 
-print("[OK] Arquivo config.toml do Umbriel atualizado e validado.")
+print("[OK] Arquivo config.toml do Umbriel configurado e validado com sucesso.")
 PYEOF
 
 # Garante permissões estritas para o usuário real

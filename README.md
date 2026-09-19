@@ -108,18 +108,18 @@ chmod +x setup.sh modules/*.sh
 
 ---
 
-## ⌨️ Atalhos de Teclado Padrão (Umbriel)
+## ⌨️ Atalhos de Teclado Nativos e Controle (Umbriel & Noctalia)
+
+O Umbriel vem com um conjunto completo de atalhos nativos de fábrica para gerenciamento de janelas e navegação, enquanto o controle de volume, brilho e rede é integrado visualmente no Noctalia Shell:
 
 | Combinação de Teclas | Ação |
 | :--- | :--- |
 | <kbd>Super</kbd> + <kbd>Enter</kbd> | Abre o Terminal GPU (`kitty`) |
-| <kbd>Super</kbd> + <kbd>L</kbd> | Bloqueia a tela (`swaylock`) |
-| <kbd>PrintScreen</kbd> | Captura de área selecionada para a área de transferência (`grim + slurp`) |
-| <kbd>XF86AudioRaiseVolume</kbd> | Aumenta o volume do áudio em 5% (`wpctl`) |
-| <kbd>XF86AudioLowerVolume</kbd> | Diminui o volume do áudio em 5% (`wpctl`) |
-| <kbd>XF86AudioMute</kbd> | Alterna mudo do áudio (`wpctl`) |
-| <kbd>XF86MonBrightnessUp</kbd> | Aumenta o brilho da tela em 5% (`brightnessctl`) |
-| <kbd>XF86MonBrightnessDown</kbd> | Diminui o brilho da tela em 5% (`brightnessctl`) |
+| <kbd>Super</kbd> + <kbd>Q</kbd> | Fecha a janela em foco |
+| <kbd>Super</kbd> + <kbd>1</kbd> a <kbd>9</kbd> | Alterna entre as áreas de trabalho |
+| <kbd>Super</kbd> + <kbd>Shift</kbd> + <kbd>1</kbd> a <kbd>9</kbd> | Move a janela para a área de trabalho selecionada |
+| <kbd>Super</kbd> + <kbd>Espaço</kbd> / Botão Superior | Abre o Lançador de Aplicativos (Noctalia Shell) |
+| *Painel Noctalia Shell* | Controle visual de Volume, Brilho, Wi-Fi, Bluetooth e Bateria |
 
 ---
 
