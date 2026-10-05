@@ -77,7 +77,7 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `dbus-broker` | **Barramento D-Bus de Alta Performance:** Implementação do barramento de comunicação do sistema, mais rápida e segura que o `dbus-daemon`. |
 | `seatd` | **Gerenciador de Assentos (Seat/Sessão):** Fornece permissões de acesso ao hardware de vídeo e teclado para o compositor Wayland sem depender de daemons pesados. |
 | `polkit` | **Framework de Autorização:** Gerencia a elevação de privilégios para tarefas administrativas. |
-| `hyprpolkitagent` | **Agente Gráfico de Senhas:** Agente moderno e seguro em C++/Qt6 nativo Wayland (alinhado ao ecossistema Noctalia, sem dependências legadas de MATE ou GNOME) para autenticação gráfica. |
+| `polkit-kde` | **Agente Gráfico de Senhas:** Agente moderno e seguro oficial do Fedora em Qt6/KF6 para autenticação gráfica. |
 | `gnome-keyring` & `libsecret` | **Cofre de Chaves e Senhas:** Guarda credenciais de Wi-Fi, chaves SSH e senhas de navegadores com criptografia segura. |
 | `xdg-desktop-portal` | **Roteador Central de Portais:** Permite que janelas Wayland comuniquem-se de forma segura com o sistema (caixas de diálogo de abrir/salvar arquivos). |
 | `xdg-desktop-portal-gtk` | **Backend de Diálogos GTK:** Renderiza janelas nativas de seleção de arquivos para aplicativos GTK. |
@@ -366,7 +366,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 
    * `xdg-desktop-portal`, `xdg-desktop-portal-gtk`, `xdg-desktop-portal-umbriel-nightly`.
 
-   * `polkit`, `hyprpolkitagent`, `gnome-keyring`, `libsecret`.
+   * `polkit`, `polkit-kde`, `gnome-keyring`, `libsecret`.
 
    * `swaylock` (Bloqueador de tela).
 
@@ -432,7 +432,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
        [general]
        autostart = [
            "noctalia",
-           "/usr/libexec/hyprpolkitagent"
+           "/usr/libexec/kf6/polkit-kde-authentication-agent-1"
        ]
        ```
      * **Máquina Virtual:**
@@ -440,7 +440,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
        [general]
        autostart = [
            "env LIBGL_ALWAYS_SOFTWARE=1 noctalia",
-           "/usr/libexec/hyprpolkitagent"
+           "/usr/libexec/kf6/polkit-kde-authentication-agent-1"
        ]
        ```
    * **Cursor na VM (`[input.cursor]`):**
@@ -480,7 +480,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 A IA que escrever o script deve fornecer testes internos de integridade que validem os seguintes itens antes de permitir o reboot:
 
 - [ ] **Validação do Greetd:** Testar se o arquivo `/etc/greetd/config.toml` foi escrito com `user = "greetd"` e verificar se o binário apontado no `command` existe no disco.
-- [ ] **Validação do Polkit:** Confirmar que `/usr/libexec/hyprpolkitagent` existe e possui permissão de execução.
+- [ ] **Validação do Polkit:** Confirmar que `/usr/libexec/kf6/polkit-kde-authentication-agent-1` existe e possui permissão de execução.
 - [ ] **Validação do Umbriel:** Checar a sintaxe TOML de `~/.config/umbriel/config.toml` com `tomllib.loads()`.
 - [ ] **Validação de Permissões:** Garantir que os diretórios `~/.config` e `~/.local` pertençam ao usuário real (`chown -R $USER:$USER`), e não ao `root`.
 - [ ] **Validação de Driver na VM:** Assegurar que nenhuma tentativa de compilar `akmod-nvidia` seja disparada se a opção "Máquina Virtual" foi a escolhida.
