@@ -117,15 +117,31 @@ old_marker = "# --- Atalhos Personalizados Fedora Noctalia ---"
 if old_marker in content:
     content = content.split(old_marker)[0].rstrip() + "\n"
 
-# 2. Configuração de [general] e autostart
-autostart_str = f'autostart = ["{noctalia_cmd}", "{polkit_bin}"]'
-if "[general]" in content:
-    if re.search(r'^\s*#?\s*autostart\s*=', content, re.MULTILINE):
-        content = re.sub(r'^\s*#?\s*autostart\s*=.*?(?=\n\S|\n\n|\Z)', autostart_str, content, count=1, flags=re.MULTILINE | re.DOTALL)
-    else:
-        content = re.sub(r'(\[general\][^\n]*\n)', r'\1' + autostart_str + '\n', content, count=1)
+# 2. Configuração de [general] e autostart (garante cabeçalho explícito e ativo)
+autostart_formatted = f'''autostart = [
+    "{noctalia_cmd}",
+    "{polkit_bin}"
+]'''
+
+# Remove comentário de "# [general]" ou "#[general]" para ativar a seção
+content = re.sub(r'^[ \t]*#[ \t]*\[general\][ \t]*$', '[general]', content, flags=re.MULTILINE)
+
+# Garante que [general] exista de forma ativa e com autostart correto
+if re.search(r'^[ \t]*\[general\]', content, re.MULTILINE):
+    def update_general_section(match):
+        sec = match.group(0)
+        # Substitui autostart existente (seja em linha única ou lista multilinha, ativo ou comentado)
+        autostart_pattern = r'^[ \t]*#?[ \t]*autostart\s*=\s*(?:\[[^\]]*\]|[^\n]+)'
+        if re.search(autostart_pattern, sec, re.MULTILINE | re.DOTALL):
+            sec = re.sub(autostart_pattern, autostart_formatted, sec, count=1, flags=re.MULTILINE | re.DOTALL)
+        else:
+            sec = re.sub(r'(^[ \t]*\[general\][^\n]*\n)', r'\1' + autostart_formatted + '\n', sec, count=1, flags=re.MULTILINE)
+        return sec
+
+    content = re.sub(r'(^[ \t]*\[general\].*?)(?=(?:^[ \t]*\[[a-zA-Z0-9_\.-]+\]|\Z))', update_general_section, content, count=1, flags=re.MULTILINE | re.DOTALL)
 else:
-    content = f"[general]\n{autostart_str}\n\n" + content
+    content = f"[general]\n{autostart_formatted}\n\n" + content
+
 
 # 3. Configuração de [input.cursor] (hardware_cursor = false se VM)
 if is_vm:
@@ -226,9 +242,9 @@ else
     log_warn "[Checklist] Agente polkit (polkit-kde) não localizado ou sem permissão de execução em: ${POLKIT_AGENT_PATH}."
 fi
 
-# Teste 4: Umbriel config sintaxe / leitura
+# Teste 4: Umbriel config sintaxe e validação oficial
 if python3 -c "import sys; toml_code = open('${UMBRIEL_CONFIG_FILE}').read(); import tomllib; tomllib.loads(toml_code)" 2>/dev/null; then
-    log_success "[Checklist] Sintaxe TOML de ${UMBRIEL_CONFIG_FILE} validada com sucesso."
+    log_success "[Checklist] Sintaxe TOML de ${UMBRIEL_CONFIG_FILE} validada com sucesso via tomllib."
 else
     # Fallback de teste se tomllib não estiver no python do teste
     if python3 -c "import sys; open('${UMBRIEL_CONFIG_FILE}').read()" 2>/dev/null; then
@@ -237,6 +253,31 @@ else
         log_error "[Checklist] Falha crítica: Erro de sintaxe TOML em ${UMBRIEL_CONFIG_FILE}!"
         exit 1
     fi
+fi
+
+log_info "Executando validador oficial do Umbriel (umbriel config validate)..."
+if command -v umbriel >/dev/null 2>&1; then
+    if UMBRIEL_VAL_OUTPUT="$(sudo -u "${REAL_USER}" umbriel config validate 2>&1)"; then
+        log_success "[Checklist] Validação oficial aprovada: 'umbriel config validate' confirmou o arquivo de configuração."
+    else
+        log_error "[Checklist] Falha crítica: 'umbriel config validate' retornou erro na configuração!"
+        while IFS= read -r val_line; do
+            log_error "  [umbriel validate] ${val_line}"
+        done <<< "${UMBRIEL_VAL_OUTPUT}"
+        exit 1
+    fi
+elif [[ -x "/usr/bin/umbriel" ]]; then
+    if UMBRIEL_VAL_OUTPUT="$(sudo -u "${REAL_USER}" /usr/bin/umbriel config validate 2>&1)"; then
+        log_success "[Checklist] Validação oficial aprovada: '/usr/bin/umbriel config validate' confirmou o arquivo."
+    else
+        log_error "[Checklist] Falha crítica: '/usr/bin/umbriel config validate' retornou erro na configuração!"
+        while IFS= read -r val_line; do
+            log_error "  [umbriel validate] ${val_line}"
+        done <<< "${UMBRIEL_VAL_OUTPUT}"
+        exit 1
+    fi
+else
+    log_warn "[Checklist] Binário 'umbriel' não encontrado no PATH para executar a validação nativa."
 fi
 
 # Teste 5: Permissões do usuário

@@ -7,7 +7,7 @@ Instalador modular, limpo e automatizado para transformar uma instalação míni
 * **Gerenciador de Login:** [Greetd](https://git.sr.ht/~kennylevinsen/greetd) + [Noctalia Greeter](https://github.com/noctalia-dev/noctalia-greeter)
 * **Compatibilidade X11:** `xwayland-satellite` (rootless isolado)
 * **Navegador Web:** Brave Origin (sem telemetria, IA ou criptomoedas)
-* **Loja de Apps:** Flathub Store WebApp (0 MB de consumo de memória em segundo plano)
+* **Loja de Apps:** GNOME Software (Loja gráfica nativa com integração ao Flathub e atualizações do sistema)
 
 ---
 
@@ -33,12 +33,11 @@ fedora-noctalia/
 │   ├── 02_gpu_drivers.sh            # Drivers Mesa abertos ou NVIDIA com akmods
 │   ├── 03_display_stack.sh          # Greetd, Noctalia Greeter e integração PAM
 │   ├── 04_compositor_shell.sh       # Umbriel, Noctalia Shell e Portais XDG
-│   ├── 05_desktop_apps.sh           # Apps de usuário, Brave Origin e Flathub WebApp
+│   ├── 05_desktop_apps.sh           # Apps de usuário, Brave Origin e Loja GNOME Software
 │   └── 06_post_install.sh           # Configuração do Umbriel, atalhos, ABNT2 e validações
 └── templates/
     ├── greetd.toml.template         # Modelo de configuração do Greetd
-    ├── pam_greetd.template          # Configuração do Gnome Keyring no PAM
-    └── flathub.desktop              # Lançador do Flathub como WebApp
+    └── pam_greetd.template          # Configuração do Gnome Keyring no PAM
 ```
 
 ---
@@ -192,4 +191,10 @@ Se você deseja um firewall com interface gráfica moderna e simples para monito
   ```bash
   sudo systemctl status greetd.service
   ```
+* **Validação do Compositor Umbriel:**
+  Verifique a sintaxe e a integridade do arquivo `~/.config/umbriel/config.toml` executando o validador oficial:
+  ```bash
+  umbriel config validate
+  ```
+
 

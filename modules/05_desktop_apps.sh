@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # fedora-noctalia: modules/05_desktop_apps.sh
-# Instalação de aplicações desktop, Brave Origin, codecs e Flathub WebApp
+# Instalação de aplicações desktop, Brave Origin, codecs e Loja GNOME Software
 # ==============================================================================
 set -euo pipefail
 
@@ -48,34 +48,22 @@ else
     log_success "Brave Origin instalado com sucesso via DNF."
 fi
 
-# 3. Criação do Lançador WebApp do Flathub (/usr/share/applications/flathub-store.desktop)
-log_info "Configurando lançador de WebApp da Loja de Aplicativos (Flathub)..."
-DESKTOP_TEMPLATE="${INSTALLER_ROOT}/templates/flathub.desktop"
-TARGET_DESKTOP="/usr/share/applications/flathub-store.desktop"
-
-# Determina se usa brave-origin ou brave-browser no Exec
-BRAVE_EXEC="brave-origin"
-if ! command -v brave-origin >/dev/null 2>&1 && command -v brave-browser >/dev/null 2>&1; then
-    BRAVE_EXEC="brave-browser"
+# 3. Remoção do Atalho Legado WebApp do Flathub (substituído pela Loja Nativa GNOME Software)
+LEGACY_FLATHUB_DESKTOP="/usr/share/applications/flathub-store.desktop"
+if [[ -f "$LEGACY_FLATHUB_DESKTOP" ]]; then
+    log_info "Removendo atalho legado da WebApp do Flathub (${LEGACY_FLATHUB_DESKTOP})..."
+    sudo rm -f "$LEGACY_FLATHUB_DESKTOP"
+    log_success "Atalho legado ${LEGACY_FLATHUB_DESKTOP} excluído com sucesso."
 fi
 
-if [[ -f "$DESKTOP_TEMPLATE" ]]; then
-    sudo sed "s|brave-origin|${BRAVE_EXEC}|g" "$DESKTOP_TEMPLATE" | sudo tee "$TARGET_DESKTOP" >/dev/null
-else
-    sudo tee "$TARGET_DESKTOP" >/dev/null <<EOF
-[Desktop Entry]
-Name=Loja de Aplicativos (Flathub)
-Comment=Explore e instale aplicativos Flatpak
-Exec=${BRAVE_EXEC} --app=https://flathub.org
-Icon=package-x-generic
-Terminal=false
-Type=Application
-Categories=System;PackageManager;
-StartupNotify=true
-EOF
-fi
+# 4. Loja Gráfica de Aplicativos Nativa (GNOME Software e repositório Flathub)
+log_info "Configurando Loja Gráfica oficial (GNOME Software) com suporte ao Flathub..."
+sudo dnf install -y --allowerasing gnome-software
 
-sudo chmod 644 "$TARGET_DESKTOP"
-log_success "Lançador do Flathub criado em ${TARGET_DESKTOP}."
+if command -v flatpak >/dev/null 2>&1; then
+    log_info "Garantindo repositório Flathub ativo para o GNOME Software..."
+    sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
+fi
+log_success "Loja Gráfica GNOME Software e integração Flathub configuradas."
 
 log_success "Módulo 05 (Aplicações Desktop) concluído com sucesso."

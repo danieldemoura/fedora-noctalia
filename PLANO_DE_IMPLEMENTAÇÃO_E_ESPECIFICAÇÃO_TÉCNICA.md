@@ -36,12 +36,11 @@ fedora-noctalia-installer/
 │   ├── 02_display_stack.sh          # Wayland, Greetd, Noctalia Greeter e PAM
 │   ├── 03_compositor_shell.sh       # Umbriel, Noctalia Shell, Xwayland-satellite e Portais
 │   ├── 04_gpu_drivers.sh            # Drivers gráficos (Mesa livre ou NVIDIA se solicitado)
-│   ├── 05_desktop_apps.sh           # Apps de uso diário, codecs multimídia e fontes
+│   ├── 05_desktop_apps.sh           # Apps de uso diário, Loja GNOME Software, codecs multimídia e fontes
 │   └── 06_post_install.sh           # Autostart, cursor na VM, layout ABNT2, target gráfico e validações
 └── templates/
     ├── greetd.toml.template         # Template de configuração do /etc/greetd/config.toml
-    ├── pam_greetd.template          # Bloco do pam_gnome_keyring.so para o PAM
-    └── flathub.desktop              # Lançador .desktop para o Flathub como WebApp
+    └── pam_greetd.template          # Bloco do pam_gnome_keyring.so para o PAM
 ```
 
 ### 1.2 Regras Estritas de Programação Shell
@@ -110,6 +109,7 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `ffmpegthumbnailer` | **Miniaturas de Vídeo:** Gera prévias dos vídeos (MP4, MKV, AVI, MOV) direto nas pastas do Nautilus. |
 | `papers-thumbnailer` | **Miniaturas de Documentos:** Gera a prévia visual da primeira página de arquivos PDF/documentos no gerenciador de arquivos. |
 | `flatpak` | **Gerenciador de Apps Isolados:** Permite instalar pacotes universais do Flathub sem sujar o sistema base. |
+| `gnome-software` | **Loja Gráfica de Aplicativos:** Loja oficial para pesquisa visual de pacotes, instalação de Flatpaks integrados ao Flathub e atualizações gráficas do sistema. |
 
 ### 2.2 Repositório RPM Fusion Free
 
@@ -392,18 +392,10 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
    * Tentar via DNF: `sudo dnf install -y --allowerasing brave-origin`
    * Se retornar erro: executar `curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh`
 
-4. **Criação da WebApp do Flathub (0 MB RAM em background):**
-   * Criar o arquivo `/usr/share/applications/flathub-store.desktop`:
-     ```ini
-     [Desktop Entry]
-     Name=Loja de Aplicativos (Flathub)
-     Comment=Explore e instale aplicativos Flatpak
-     Exec=brave-origin --app=https://flathub.org
-     Icon=package-x-generic
-     Terminal=false
-     Type=Application
-     Categories=System;PackageManager;
-     ```
+4. **Instalação da Loja Gráfica Nativa (GNOME Software) e Limpeza de Atalho Legado:**
+   * Remover atalho legado `/usr/share/applications/flathub-store.desktop` (se existir).
+   * Instalar o pacote oficial: `sudo dnf install -y --allowerasing gnome-software`.
+   * Assegurar que o repositório oficial Flathub continue configurado (`sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo`), proporcionando integração completa com a loja para pesquisa, instalação de Flatpaks e atualizações gráficas do sistema.
 
 ---
 
@@ -427,6 +419,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 
 3. **Ajustes Estritamente Necessários no TOML:**
    * **Autostart (`[general]`):**
+     * *Tratamento de Causa Raiz:* No template padrão `/usr/share/umbriel/config.toml`, o cabeçalho `[general]` vem comentado como `# [general]`. A rotina Python remove o caractere `#` e ativa explicitamente a seção `[general]` antes de definir `autostart`, evitando o erro `unknown key include.optional.autostart`.
      * **Máquina Física:**
        ```toml
        [general]
@@ -482,6 +475,7 @@ A IA que escrever o script deve fornecer testes internos de integridade que vali
 - [ ] **Validação do Greetd:** Testar se o arquivo `/etc/greetd/config.toml` foi escrito com `user = "greetd"` e verificar se o binário apontado no `command` existe no disco.
 - [ ] **Validação do Polkit:** Confirmar que `/usr/libexec/kf6/polkit-kde-authentication-agent-1` existe e possui permissão de execução.
 - [ ] **Validação do Umbriel:** Checar a sintaxe TOML de `~/.config/umbriel/config.toml` com `tomllib.loads()`.
+- [ ] **Validação Oficial do Umbriel:** Executar `sudo -u "$REAL_USER" umbriel config validate` garantindo que o compositor não reporte erros de sintaxe ou chaves desconhecidas.
 - [ ] **Validação de Permissões:** Garantir que os diretórios `~/.config` e `~/.local` pertençam ao usuário real (`chown -R $USER:$USER`), e não ao `root`.
 - [ ] **Validação de Driver na VM:** Assegurar que nenhuma tentativa de compilar `akmod-nvidia` seja disparada se a opção "Máquina Virtual" foi a escolhida.
 
@@ -510,6 +504,8 @@ Abaixo está o registro técnico consolidado de todos os comportamentos inespera
 | :--- | :--- | :--- |
 | **`playerctl` ausente** | Teclas multimídia Play/Pause, Next e Prev não funcionavam por falta de daemon MPRIS CLI. | Adicionado o pacote `playerctl` em `config/packages-apps.conf`. |
 | **Integridade do TOML do Umbriel** | Risco de colisões de atalhos e avisos de sintaxe ao tentar injetar atalhos personalizados no TOML. | Preservação integral do arquivo oficial `/usr/share/umbriel/config.toml` sem injeção de atalhos extras, ajustando apenas autostart, cursor e ABNT2. |
+| **Injeção de Autostart no Umbriel (`# [general]`)** | No `/usr/share/umbriel/config.toml`, o cabeçalho vem comentado como `# [general]`. A injeção de `autostart` logo abaixo fazia a chave ser atribuída à seção `[include.optional]` gerando `unknown key include.optional.autostart`. | Descomentado explicitamente o cabeçalho `# [general]` para torná-lo ativo e adicionado teste `umbriel config validate` no checklist final. |
+| **Loja de Aplicativos Gráfica vs WebApp** | WebApp do Flathub dependia de navegador e não oferecia atualizações gráficas de pacotes nem integração nativa do sistema. | Instalação da loja nativa `gnome-software` com repositório Flathub ativo e remoção do atalho legado WebApp. |
 | **Conflito FFmpeg** | DNF abortava devido a conflito entre `libswresample-free` da base e pacotes irrestritos do RPM Fusion. | Execução de `dnf swap -y --allowerasing ffmpeg-free ffmpeg` e uso da flag `--allowerasing`. |
 | **Flatpak Polkit Prompt** | Chamada do Flatpak sem privilégios disparava pedido interativo de senha no terminal (`org.freedesktop.Flatpak.configure-remote`). | Execução com `sudo flatpak remote-add --if-not-exists flathub ...`. |
 | **Idempotência do Repositório Terra** | Reexecução do módulo tentava recriar repositório com o mesmo ID gerando erro no DNF5. | Verificação de segurança prévia com `if ! rpm -q terra-release &>/dev/null && [ ! -f /etc/yum.repos.d/terra.repo ]`. |
