@@ -30,7 +30,7 @@ sudo dnf install -y \
     xdg-desktop-portal-gtk \
     xdg-desktop-portal-umbriel-nightly \
     polkit \
-    mate-polkit \
+    hyprpolkitagent \
     gnome-keyring \
     libsecret \
     swaylock
@@ -51,10 +51,10 @@ EOF
 log_success "Portais XDG configurados."
 
 # 3. Verificação do Agente de Autenticação Polkit
-if [[ -f "/usr/libexec/polkit-mate-authentication-agent-1" ]] || [[ -f "/usr/lib/polkit-mate-authentication-agent-1" ]]; then
-    log_success "Agente mate-polkit localizado no sistema."
+if [[ -x "/usr/libexec/hyprpolkitagent" ]] || [[ -f "/usr/libexec/hyprpolkitagent" ]] || [[ -x "/usr/lib/hyprpolkitagent" ]] || [[ -f "/usr/lib/hyprpolkitagent" ]]; then
+    log_success "Agente hyprpolkitagent localizado no sistema."
 else
-    log_warn "Agente mate-polkit não localizado nos caminhos padrão (/usr/libexec/polkit-mate-authentication-agent-1)."
+    log_warn "Agente hyprpolkitagent não localizado nos caminhos padrão (/usr/libexec/hyprpolkitagent)."
 fi
 
 log_success "Módulo 04 (Compositor e Shell) concluído com sucesso."

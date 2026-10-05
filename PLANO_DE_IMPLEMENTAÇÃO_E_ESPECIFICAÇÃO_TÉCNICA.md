@@ -77,7 +77,7 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `dbus-broker` | **Barramento D-Bus de Alta Performance:** Implementação do barramento de comunicação do sistema, mais rápida e segura que o `dbus-daemon`. |
 | `seatd` | **Gerenciador de Assentos (Seat/Sessão):** Fornece permissões de acesso ao hardware de vídeo e teclado para o compositor Wayland sem depender de daemons pesados. |
 | `polkit` | **Framework de Autorização:** Gerencia a elevação de privilégios para tarefas administrativas. |
-| `mate-polkit` | **Agente Gráfico de Senhas:** Exibe a janelinha gráfica solicitando senha de administrador em sessões Wayland puras (substituto oficial do falecido `polkit-gnome`). |
+| `hyprpolkitagent` | **Agente Gráfico de Senhas:** Agente moderno e seguro em C++/Qt6 nativo Wayland (alinhado ao ecossistema Noctalia, sem dependências legadas de MATE ou GNOME) para autenticação gráfica. |
 | `gnome-keyring` & `libsecret` | **Cofre de Chaves e Senhas:** Guarda credenciais de Wi-Fi, chaves SSH e senhas de navegadores com criptografia segura. |
 | `xdg-desktop-portal` | **Roteador Central de Portais:** Permite que janelas Wayland comuniquem-se de forma segura com o sistema (caixas de diálogo de abrir/salvar arquivos). |
 | `xdg-desktop-portal-gtk` | **Backend de Diálogos GTK:** Renderiza janelas nativas de seleção de arquivos para aplicativos GTK. |
@@ -93,12 +93,11 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `cups`, `cups-filters`, `ipp-usb` | **Impressão Universal Sem Driver:** Implementa o protocolo IPP Everywhere / Mopria. Detecta e imprime em 95% das impressoras modernas USB e Wi-Fi sem instalar drivers de CD. |
 | `sane-backends`, `sane-airscan` | **Digitalização Sem Driver:** Suporte universal para scanners USB e scanners de rede via protocolos eSCL e WSD. |
 | `simple-scan` | **App de Scanner:** Interface visual simples para digitalizar documentos em PDF ou imagem. |
-| `nautilus` | **Gerenciador de Arquivos:** Aplicação moderna em GTK4 para gerenciar arquivos, pastas e discos. |
+| `nautilus` | **Gerenciador de Arquivos:** Aplicação moderna em GTK4 para gerenciar arquivos, pastas e discos (manipulação nativa e transparente de compactados via `gnome-autoar`). |
 | `gvfs-mtp`, `gvfs-smb`, `gvfs-archive`, `gvfs-fuse` | **Módulos do Sistema de Arquivos:** Conexão com celulares Android (MTP), pastas compartilhadas de rede Windows (Samba), navegação em arquivos compactados e integração FUSE. |
 | `loupe` | **Visualizador de Imagens:** Visualizador moderno em GTK4. Extremamente rápido e seguro. |
-| `evince` | **Visualizador de Documentos:** Leitor leve e confiável para arquivos PDF e PostScript. |
+| `papers` | **Visualizador de Documentos:** Sucessor moderno do Evince em GTK4, Libadwaita e Rust, com suporte fluido a gestos multitoque no Wayland. |
 | `gnome-text-editor` | **Editor de Texto:** Substituto moderno do Gedit para notas e arquivos de configuração. |
-| `file-roller` & `file-roller-nautilus` | **Compactador Gráfico:** Interface para manipular arquivos compactados e adicionar a opção "Extrair Aqui" no menu de clique direito do Nautilus. |
 | `celluloid` | **Player Multimídia:** Interface GTK limpa baseada no motor MPV. Executa qualquer arquivo de vídeo ou áudio sem travamentos. |
 | `kitty` | **Terminal Acelerado por GPU:** Emulador de terminal padrão, associado de fábrica ao atalho `Mod+Enter` no Umbriel. |
 | `gnome-disk-utility` | **Gerenciador de Discos:** Utilitário visual para formatar pendrives, criar partições e gravar arquivos `.iso`. |
@@ -109,7 +108,7 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `google-noto-*-fonts` | **Tipografia Completa:** Famílias Noto Sans, Serif, CJK (caracteres asiáticos) e Color Emoji para evitar blocos vazios na web. |
 | `glycin-thumbnailer` | **Miniaturas em Sandbox:** Gera miniaturas seguras de imagens WebP, AVIF, SVG, JPEG-XL no Nautilus. |
 | `ffmpegthumbnailer` | **Miniaturas de Vídeo:** Gera prévias dos vídeos (MP4, MKV, AVI, MOV) direto nas pastas do Nautilus. |
-| `evince-thumbnailer` | **Miniaturas de Documentos:** Gera a prévia visual da primeira página de arquivos PDF no gerenciador de arquivos. |
+| `papers-thumbnailer` | **Miniaturas de Documentos:** Gera a prévia visual da primeira página de arquivos PDF/documentos no gerenciador de arquivos. |
 | `flatpak` | **Gerenciador de Apps Isolados:** Permite instalar pacotes universais do Flathub sem sujar o sistema base. |
 
 ### 2.2 Repositório RPM Fusion Free
@@ -367,7 +366,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 
    * `xdg-desktop-portal`, `xdg-desktop-portal-gtk`, `xdg-desktop-portal-umbriel-nightly`.
 
-   * `polkit`, `mate-polkit`, `gnome-keyring`, `libsecret`.
+   * `polkit`, `hyprpolkitagent`, `gnome-keyring`, `libsecret`.
 
    * `swaylock` (Bloqueador de tela).
 
@@ -383,10 +382,10 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
    * Utilizar a flag `--allowerasing` nas chamadas do DNF deste módulo.
 
 2. **Instalar os programas de uso diário aprovados:**
-   * Produtividade: `kitty`, `nautilus`, `loupe`, `evince`, `gnome-text-editor`, `file-roller`, `file-roller-nautilus`, `celluloid`, `simple-scan`, `gnome-disk-utility`.
+   * Produtividade: `kitty`, `nautilus`, `loupe`, `papers`, `gnome-text-editor`, `celluloid`, `simple-scan`, `gnome-disk-utility`.
    * Captura de tela e controle multimídia: `grim`, `slurp`, `wl-clipboard`, `playerctl`.
-   * Arquivos compactados: `p7zip`, `p7zip-plugins`, `unrar`, `zstd`, `tar`, `xz`, `unzip`.
-   * Miniaturas: `glycin-thumbnailer`, `ffmpegthumbnailer`, `evince-thumbnailer`.
+   * Utilitários de backend para arquivos compactados: `p7zip`, `p7zip-plugins`, `unrar`, `zstd`, `tar`, `xz`, `unzip`.
+   * Miniaturas: `glycin-thumbnailer`, `ffmpegthumbnailer`, `papers-thumbnailer`.
    * Fontes e Ícones: `adwaita-icon-theme`, `google-noto-sans-fonts`, `google-noto-serif-fonts`, `google-noto-sans-cjk-fonts`, `google-noto-color-emoji-fonts`.
 
 3. **Instalação do Brave Origin (com contingência):**
@@ -433,7 +432,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
        [general]
        autostart = [
            "noctalia",
-           "/usr/libexec/polkit-mate-authentication-agent-1"
+           "/usr/libexec/hyprpolkitagent"
        ]
        ```
      * **Máquina Virtual:**
@@ -441,7 +440,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
        [general]
        autostart = [
            "env LIBGL_ALWAYS_SOFTWARE=1 noctalia",
-           "/usr/libexec/polkit-mate-authentication-agent-1"
+           "/usr/libexec/hyprpolkitagent"
        ]
        ```
    * **Cursor na VM (`[input.cursor]`):**
@@ -481,7 +480,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 A IA que escrever o script deve fornecer testes internos de integridade que validem os seguintes itens antes de permitir o reboot:
 
 - [ ] **Validação do Greetd:** Testar se o arquivo `/etc/greetd/config.toml` foi escrito com `user = "greetd"` e verificar se o binário apontado no `command` existe no disco.
-- [ ] **Validação do Polkit:** Confirmar que `/usr/libexec/polkit-mate-authentication-agent-1` existe no caminho correto.
+- [ ] **Validação do Polkit:** Confirmar que `/usr/libexec/hyprpolkitagent` existe e possui permissão de execução.
 - [ ] **Validação do Umbriel:** Checar a sintaxe TOML de `~/.config/umbriel/config.toml` com `tomllib.loads()`.
 - [ ] **Validação de Permissões:** Garantir que os diretórios `~/.config` e `~/.local` pertençam ao usuário real (`chown -R $USER:$USER`), e não ao `root`.
 - [ ] **Validação de Driver na VM:** Assegurar que nenhuma tentativa de compilar `akmod-nvidia` seja disparada se a opção "Máquina Virtual" foi a escolhida.
@@ -583,4 +582,12 @@ O `oo7` é uma implementação do **Secrets Service Provider** em Rust, desenvol
 3. Adaptar o bloco PAM para o mecanismo de desbloqueio nativo do `oo7`.
 
 **Enquanto a migração não ocorre, o `gnome-keyring` é o provedor canônico e estável para Fedora 44.**
+
+---
+
+## 11. GUIA DE PÓS-INSTALAÇÃO OPCIONAL: FIREWALL PORTMASTER
+
+Para preservar a base estritamente limpa e minimalista do Fedora Noctalia, o firewall **Portmaster** e suas dependências gráficas (`libayatana-appindicator-gtk3`, `webkit2gtk4.1`) **não são instalados por padrão**.
+
+Caso o usuário queira um firewall com interface gráfica moderna para monitorar conexões e definir regras por aplicação, o procedimento de instalação local deve ser executado manualmente pós-instalação, conforme detalhado no [README.md](file:///c:/Users/Shihaiky/Downloads/fedora-noctalia/README.md).
 

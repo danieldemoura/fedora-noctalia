@@ -35,12 +35,12 @@ sudo chmod 600 "${KEYRINGS_DIR}/default" 2>/dev/null || true
 log_success "Chaveiro padrão configurado em ${KEYRINGS_DIR}/default."
 
 # 2. Localização do Agente Polkit
-POLKIT_AGENT_PATH="/usr/libexec/polkit-mate-authentication-agent-1"
+POLKIT_AGENT_PATH="/usr/libexec/hyprpolkitagent"
 if [[ ! -f "$POLKIT_AGENT_PATH" ]]; then
-    if [[ -f "/usr/lib/polkit-mate-authentication-agent-1" ]]; then
-        POLKIT_AGENT_PATH="/usr/lib/polkit-mate-authentication-agent-1"
+    if [[ -f "/usr/lib/hyprpolkitagent" ]]; then
+        POLKIT_AGENT_PATH="/usr/lib/hyprpolkitagent"
     else
-        log_warn "Caminho do polkit-mate não encontrado exatamente em /usr/libexec. Mantendo padrão."
+        log_warn "Caminho do hyprpolkitagent não encontrado exatamente em /usr/libexec. Mantendo padrão."
     fi
 fi
 
@@ -223,11 +223,11 @@ else
     log_warn "[Checklist] Binário noctalia-greeter-session não encontrado com permissão de execução."
 fi
 
-# Teste 3: Polkit agent
-if [[ -f "$POLKIT_AGENT_PATH" ]]; then
-    log_success "[Checklist] Agente polkit verificado em: ${POLKIT_AGENT_PATH}."
+# Teste 3: Polkit agent (hyprpolkitagent)
+if [[ -x "$POLKIT_AGENT_PATH" ]] || [[ -f "$POLKIT_AGENT_PATH" ]]; then
+    log_success "[Checklist] Agente polkit (hyprpolkitagent) verificado e executável em: ${POLKIT_AGENT_PATH}."
 else
-    log_warn "[Checklist] Agente polkit não localizado no caminho esperado: ${POLKIT_AGENT_PATH}."
+    log_warn "[Checklist] Agente polkit (hyprpolkitagent) não localizado ou sem permissão de execução em: ${POLKIT_AGENT_PATH}."
 fi
 
 # Teste 4: Umbriel config sintaxe / leitura

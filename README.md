@@ -152,6 +152,31 @@ Atualmente a base do Fedora 44 usa o `gnome-keyring` como provedor padrão do pr
 
 ---
 
+## 🛡️ Opcional: Firewall Gráfico de Aplicações (Portmaster)
+
+Se você deseja um firewall com interface gráfica moderna e simples para monitorar e definir regras de conexão por aplicativo:
+
+1. Instale as dependências da interface gráfica:
+   ```bash
+   sudo dnf install -y libayatana-appindicator-gtk3 webkit2gtk4.1
+   ```
+
+2. Baixe o pacote RPM oficial e mais recente no site:
+   Acesse [https://safing.io/](https://safing.io/) e faça o download do instalador `.rpm` para Linux.
+
+3. Abra o terminal na pasta onde o arquivo foi baixado (por padrão, Downloads) e faça a instalação local:
+   ```bash
+   cd ~/Downloads
+   sudo dnf install -y ./Portmaster*.rpm
+   ```
+
+4. Habilite e inicie o serviço em segundo plano do firewall:
+   ```bash
+   sudo systemctl enable --now portmaster.service
+   ```
+
+---
+
 ## 🔍 Solução de Problemas e Auditoria
 
 * **Log Detalhado:** O histórico completo de execução com timestamps é gravado em:
@@ -167,3 +192,4 @@ Atualmente a base do Fedora 44 usa o `gnome-keyring` como provedor padrão do pr
   ```bash
   sudo systemctl status greetd.service
   ```
+
