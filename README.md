@@ -137,13 +137,13 @@ O instalador foi projetado para acompanhar automaticamente o ciclo de lançament
 
 ## 🔑 Gerenciamento de Credenciais (Chaveiro / Keyring)
 
-O instalador configura automaticamente o subsistema de credenciais para que o **cofre de senhas não seja solicitado no primeiro login** (problema do diálogo *"Choose password for new keyring"*).
+O instalador configura automaticamente o subsistema de credenciais para garantir uma experiência de autenticação transparente, silenciosa e segura — eliminando por completo diálogos intrusivos como *"An application wants access to the keyring 'Default Keyring', but it is locked"*, de forma idêntica à de distribuições desktop completas (GNOME/KDE).
 
-### O que é feito automaticamente
+### Como a integração funciona
 
-* O diretório `~/.local/share/keyrings/` é criado com permissão `700`.
-* Um ponteiro padrão é gerado, vinculando o chaveiro ao **PAM** (login automático e integrado à senha de sessão).
-* O `gnome-keyring-daemon` é inicializado via `pam_gnome_keyring.so` no arquivo PAM do `greetd`.
+* **Módulo PAM (`gnome-keyring-pam`):** No Fedora, o módulo `pam_gnome_keyring.so` reside em um pacote separado do daemon. Ele é instalado obrigatoriamente para interceptar as credenciais digitadas no Greetd e desbloquear silenciosamente o cofre canônico `login.keyring` no início da sessão gráfica.
+* **Ponteiro Canônico (`default` -> `login`):** Aplicações (como Brave, navegadores Chromium, Git Credential Manager e Wi-Fi) solicitam via D-Bus (`org.freedesktop.Secrets`) o chaveiro configurado como `default`. Sem o arquivo ponteiro, o daemon assume ausência de padrão e tenta criar `Default_Keyring.keyring`, gerando pedidos incessantes de senha a cada boot. Com `~/.local/share/keyrings/default` pré-configurado contendo `login` (permissão `600`, diretório `700`), todas as aplicações são direcionadas ao chaveiro que o PAM já destrancou na inicialização.
+* **Limpeza Defensiva e Idempotência:** Arquivos órfãos ou corrompidos gerados fora do PAM são removidos preventivamente, garantindo total estabilidade mesmo em reexecuções do instalador.
 
 ### Roadmap futuro (`oo7`)
 

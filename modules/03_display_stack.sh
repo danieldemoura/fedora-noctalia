@@ -22,7 +22,7 @@ ui_section_header "MÓDULO 03: PILHA DO DISPLAY MANAGER E LOGIN"
 
 # 1. Instalação do Greetd, Greetd-SELinux e Noctalia-Greeter
 log_info "Instalando greetd, políticas SELinux e noctalia-greeter..."
-sudo dnf install -y greetd greetd-selinux noctalia-greeter
+sudo dnf install -y greetd greetd-selinux noctalia-greeter gnome-keyring-pam
 
 # Permissões de hardware para o usuário do greetd
 log_info "Configurando permissões de hardware (video, render, input) para o usuário greetd..."

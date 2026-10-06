@@ -25,14 +25,20 @@ REAL_HOME="$(get_real_user_home)"
 
 log_info "Executando ajustes pós-instalação para o usuário: ${REAL_USER} (${REAL_HOME})"
 
-# 1. Pré-criação do Chaveiro Padrão do GNOME Keyring (Evita diálogo 'Choose password')
-log_info "Inicializando chaveiro padrão do GNOME Keyring para o usuário..."
+# 1. Inicialização do cofre de credenciais e vínculo canônico com o PAM
+log_info "Configurando integração silenciosa do GNOME Keyring com o PAM..."
 KEYRINGS_DIR="${REAL_HOME}/.local/share/keyrings"
 sudo -u "${REAL_USER}" mkdir -p "${KEYRINGS_DIR}"
-echo "login" | sudo -u "${REAL_USER}" tee "${KEYRINGS_DIR}/default" >/dev/null
 sudo chmod 700 "${KEYRINGS_DIR}"
-sudo chmod 600 "${KEYRINGS_DIR}/default" 2>/dev/null || true
-log_success "Chaveiro padrão configurado em ${KEYRINGS_DIR}/default."
+
+# Limpeza defensiva de chaveiros avulsos corrompidos gerados fora do PAM
+sudo -u "${REAL_USER}" rm -f "${KEYRINGS_DIR}/Default_Keyring.keyring" "${KEYRINGS_DIR}/user.keystore"
+
+# Define 'login' como o chaveiro padrão do sistema
+echo "login" | sudo -u "${REAL_USER}" tee "${KEYRINGS_DIR}/default" >/dev/null
+sudo chmod 600 "${KEYRINGS_DIR}/default"
+sudo chown -R "${REAL_USER}:${REAL_USER}" "${KEYRINGS_DIR}"
+log_success "Ponteiro do chaveiro canônico 'login' configurado em ${KEYRINGS_DIR}/default."
 
 # 2. Localização do Agente Polkit
 POLKIT_AGENT_PATH="/usr/libexec/kf6/polkit-kde-authentication-agent-1"
@@ -296,6 +302,41 @@ if [[ "${IS_VM:-false}" == true ]]; then
     else
         log_success "[Checklist] Confirmado: drivers proprietários NVIDIA não foram instalados na VM."
     fi
+fi
+
+# Teste 7: Validação da instalação do pacote gnome-keyring-pam
+if rpm -q gnome-keyring-pam >/dev/null 2>&1; then
+    log_success "[Checklist] Pacote 'gnome-keyring-pam' confirmado instalado."
+else
+    log_error "[Checklist] Falha crítica: Pacote 'gnome-keyring-pam' não está instalado!"
+    exit 1
+fi
+
+# Teste 8: Validação do ponteiro padrão do chaveiro (${KEYRINGS_DIR}/default)
+if [[ -f "${KEYRINGS_DIR}/default" ]] && [[ "$(cat "${KEYRINGS_DIR}/default" 2>/dev/null)" == "login" ]]; then
+    DEFAULT_PERM="$(stat -c '%a' "${KEYRINGS_DIR}/default" 2>/dev/null || echo '')"
+    if [[ "$DEFAULT_PERM" == "600" ]]; then
+        log_success "[Checklist] Arquivo ${KEYRINGS_DIR}/default verificado (conteúdo 'login' e permissão 600)."
+    else
+        log_warn "[Checklist] Permissão de ${KEYRINGS_DIR}/default era '${DEFAULT_PERM}'. Corrigindo para 600..."
+        sudo chmod 600 "${KEYRINGS_DIR}/default"
+        log_success "[Checklist] Permissão de ${KEYRINGS_DIR}/default ajustada para 600."
+    fi
+else
+    log_error "[Checklist] Falha crítica: ${KEYRINGS_DIR}/default não existe ou não contém exatamente 'login'!"
+    exit 1
+fi
+
+# Teste 9: Validação de permissão e propriedade da pasta keyrings
+KEYRINGS_PERM="$(stat -c '%a' "${KEYRINGS_DIR}" 2>/dev/null || echo '')"
+KEYRINGS_OWNER="$(stat -c '%U' "${KEYRINGS_DIR}" 2>/dev/null || echo '')"
+if [[ "$KEYRINGS_PERM" == "700" ]] && [[ "$KEYRINGS_OWNER" == "$REAL_USER" ]]; then
+    log_success "[Checklist] Pasta ${KEYRINGS_DIR} confirmada com permissão 700 pertencente a ${REAL_USER}."
+else
+    log_warn "[Checklist] Permissão/proprietário da pasta ${KEYRINGS_DIR} (${KEYRINGS_PERM}, ${KEYRINGS_OWNER}). Corrigindo..."
+    sudo chmod 700 "${KEYRINGS_DIR}"
+    sudo chown -R "${REAL_USER}:${REAL_USER}" "${KEYRINGS_DIR}"
+    log_success "[Checklist] Pasta ${KEYRINGS_DIR} corrigida para 700 e propriedade de ${REAL_USER}."
 fi
 
 echo ""

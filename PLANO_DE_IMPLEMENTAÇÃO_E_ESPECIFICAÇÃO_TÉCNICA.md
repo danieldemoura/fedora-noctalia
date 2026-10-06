@@ -78,6 +78,7 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `polkit` | **Framework de Autorização:** Gerencia a elevação de privilégios para tarefas administrativas. |
 | `polkit-kde` | **Agente Gráfico de Senhas:** Agente moderno e seguro oficial do Fedora em Qt6/KF6 para autenticação gráfica. |
 | `gnome-keyring` & `libsecret` | **Cofre de Chaves e Senhas:** Guarda credenciais de Wi-Fi, chaves SSH e senhas de navegadores com criptografia segura. |
+| `gnome-keyring-pam` | **Módulo PAM:** Intercepta a senha de login do Greetd e desbloqueia silenciosamente o chaveiro 'login.keyring' no início da sessão gráfica. |
 | `xdg-desktop-portal` | **Roteador Central de Portais:** Permite que janelas Wayland comuniquem-se de forma segura com o sistema (caixas de diálogo de abrir/salvar arquivos). |
 | `xdg-desktop-portal-gtk` | **Backend de Diálogos GTK:** Renderiza janelas nativas de seleção de arquivos para aplicativos GTK. |
 | `xdg-user-dirs` & `xdg-utils` | **Diretórios de Usuário:** Cria as pastas padrões (`Downloads`, `Documentos`, `Imagens`) e fornece o comando `xdg-open`. |
@@ -366,7 +367,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 
    * `xdg-desktop-portal`, `xdg-desktop-portal-gtk`, `xdg-desktop-portal-umbriel-nightly`.
 
-   * `polkit`, `polkit-kde`, `gnome-keyring`, `libsecret`.
+   * `polkit`, `polkit-kde`, `gnome-keyring`, `gnome-keyring-pam`, `libsecret`.
 
    * `swaylock` (Bloqueador de tela).
 
@@ -478,6 +479,7 @@ A IA que escrever o script deve fornecer testes internos de integridade que vali
 - [ ] **Validação Oficial do Umbriel:** Executar `sudo -u "$REAL_USER" umbriel config validate` garantindo que o compositor não reporte erros de sintaxe ou chaves desconhecidas.
 - [ ] **Validação de Permissões:** Garantir que os diretórios `~/.config` e `~/.local` pertençam ao usuário real (`chown -R $USER:$USER`), e não ao `root`.
 - [ ] **Validação de Driver na VM:** Assegurar que nenhuma tentativa de compilar `akmod-nvidia` seja disparada se a opção "Máquina Virtual" foi a escolhida.
+- [ ] **Validação do Keyring e PAM:** Confirmar que o pacote `gnome-keyring-pam` está instalado, o ponteiro `~/.local/share/keyrings/default` contém exatamente `login` com permissão `600`, e o diretório `~/.local/share/keyrings` possui permissão estrita `700` sob propriedade do usuário real.
 
 ---
 
@@ -512,7 +514,7 @@ Abaixo está o registro técnico consolidado de todos os comportamentos inespera
 | **Escopo de Variáveis (`IS_VM`)** | Execução de `source config/settings.conf` dentro dos módulos resetava variáveis exportadas pelo `setup.sh`. | Uso de `export` explícito no `setup.sh` e expansão padrão `: "${IS_VM:=false}"` no `settings.conf`. |
 | **Isolamento de Máquina Virtual** | Módulo de GPU tentava configurar `switcheroo-control` e VA-API dedicados na VM. | Saída antecipada limpa (`return 0`) no início de `02_gpu_drivers.sh` quando `IS_VM=true`. |
 | **Display Manager em VM (Greetd)** | Usuário `greetd` não possuía acesso ao hardware de vídeo resultando em tela preta no boot. | Atribuição dos grupos `video,render,input` ao usuário `greetd` e flags de renderização por software (`LIBGL_ALWAYS_SOFTWARE=1`). |
-| **Chaveiro GNOME Keyring** | Diálogo "Choose password for new keyring" exibido no primeiro boot. | Inicialização prévia de `${REAL_HOME}/.local/share/keyrings/default` apontando para `login` com permissão `700/600`. |
+| **Armadilha do Chaveiro / "Default Keyring" Bloqueado** | Diálogo *"An application wants access to the keyring 'Default Keyring', but it is locked"*. O módulo PAM (`pam_gnome_keyring.so`) só desbloqueia o chaveiro `login.keyring`, enquanto apps (Brave, Git, Wi-Fi) solicitam via D-Bus o chaveiro `default`. Sem o arquivo ponteiro, o daemon tenta criar `Default_Keyring.keyring`, que nunca é desbloqueado pelo PAM. Além disso, no Fedora `pam_gnome_keyring.so` reside no pacote separado `gnome-keyring-pam`. | 1. Instalação obrigatória de `gnome-keyring-pam` via DNF.<br>2. Pré-criação de `~/.local/share/keyrings/default` com `login` (perm `600`, pasta `700`), redirecionando apps ao `login.keyring` já destrancado pelo PAM.<br>3. Limpeza defensiva preventiva de `Default_Keyring.keyring` e `user.keystore`. |
 
 ---
 
@@ -547,27 +549,60 @@ O instalador foi deliberadamente projetado para **não envelhecer** ao avançar 
 
 ### 10.1 Estado Atual: `gnome-keyring` + PAM (Fedora 44)
 
-A instalação mínima do Fedora (Netinstall/Everything) **não inclui nenhum provedor de Secrets Service por padrão**. O módulo `06_post_install.sh` implementa a inicialização do subsistema da seguinte forma:
+A instalação mínima do Fedora (Netinstall/Everything) **não inclui nenhum provedor de Secrets Service por padrão**. O módulo `06_post_install.sh` implementa a inicialização do subsistema de credenciais para garantir desbloqueio silencioso, ausência total de caixas de diálogo no boot e integração transparente com aplicações de terceiros.
 
-**Pacotes instalados pelo módulo `01_system_hardware.sh` ou `03_display_stack.sh`:**
-- `gnome-keyring` — daemon que implementa o protocolo D-Bus `org.freedesktop.Secrets`.
-- `gnome-keyring-pam` — módulo PAM que inicializa o daemon no momento do login.
+#### 1. Separação de Pacotes no Fedora (`gnome-keyring` vs `gnome-keyring-pam`)
+Diferente de algumas outras distribuições Linux onde o daemon e o módulo PAM vêm em um único pacote, no Fedora o módulo `pam_gnome_keyring.so` é distribuído exclusivamente no pacote **`gnome-keyring-pam`**. Sem esse pacote instalado:
+- O arquivo `/etc/pam.d/greetd` ignora silenciosamente o módulo PAM (especialmente quando diretivas são prefixadas por `-` ou marcadas como `optional`).
+- O daemon `gnome-keyring-daemon` não recebe as credenciais durante a autenticação gráfica do Greetd, mantendo todos os chaveiros bloqueados.
+- Portanto, a inclusão de `gnome-keyring-pam` em `config/packages-base.conf` e a garantia de sua instalação via DNF são passos mandatórios da infraestrutura.
+
+#### 2. Mecanismo Interno: O que o PAM faz sozinho
+O módulo `pam_gnome_keyring.so` intercepta a autenticação do `greetd`:
+- Cria (caso não exista) e destranca automaticamente um arquivo de chaveiro com nome canônico estrito: **`login`** (`login.keyring`), derivando a chave criptográfica diretamente da senha de login fornecida pelo usuário.
+- **O PAM nunca cria o arquivo ponteiro `default`**: por design, o módulo PAM gerencia estritamente o cofre `login.keyring` e não toma iniciativas sobre a semântica de qual chaveiro o daemon deve expor como padrão às aplicações.
+
+#### 3. O Papel dos Aplicativos (Brave, Chrome, Git Credential Manager, Wi-Fi)
+Aplicações que interagem com o sistema operacional para guardar ou recuperar segredos utilizam a especificação de API D-Bus `org.freedesktop.Secrets` (ou chamadas via `libsecret`).
+- Essas aplicações **não buscam** por um cofre chamado "login".
+- Elas enviam uma chamada D-Bus ao daemon requisitando o cofre identificado pelo alias **`default`** (ou caminho `/org/freedesktop/secrets/aliases/default`).
+
+#### 4. A Armadilha do *Default Keyring* sem o arquivo ponteiro
+Se o arquivo ponteiro `~/.local/share/keyrings/default` não existir previamente na sessão:
+1. Ao receber a requisição de uma aplicação solicitando o chaveiro padrão, o `gnome-keyring-daemon` verifica que nenhum chaveiro está marcado como default.
+2. O daemon então cria um novo arquivo de chaveiro chamado `Default_Keyring.keyring` e dispara na tela um diálogo gráfico solicitando que o usuário defina uma senha: *"Choose password for new keyring"* ou *"An application wants access to the keyring 'Default Keyring', but it is locked"*.
+3. Como o PAM foi programado para desbloquear exclusivamente o `login.keyring`, esse `Default_Keyring.keyring` recém-gerado permanece permanentemente trancado a cada novo boot do sistema. O usuário passa a ser perturbado por pedidos insistentes de senha toda vez que abre o navegador ou conecta a uma rede.
+
+#### 5. A Solução Arquitetural Implementada
+O instalador `fedora-noctalia` resolve o problema de ponta a ponta com três medidas arquiteturais integradas:
+
+1. **Instalação Obrigatória do Pacote PAM:** Adição de `gnome-keyring-pam` nos pacotes base (`packages-base.conf`) e verificação via DNF em `01_system_hardware.sh` e `03_display_stack.sh`.
+2. **Pré-criação do Ponteiro Canônico `default`:** O módulo `06_post_install.sh` cria previamente o arquivo `~/.local/share/keyrings/default` com o conteúdo literal `login` (permissão estrita `600`, diretório em `700`). Quando qualquer aplicação solicita o cofre padrão via D-Bus, o daemon redireciona a requisição instantaneamente para o `login.keyring`, que o PAM já havia destrancado transparentemente na inicialização do `greetd`. O resultado é zero caixas de diálogo e fluidez total.
+3. **Limpeza Defensiva e Idempotência:** Para o caso de reexecuções do script em sistemas onde chaveiros órfãos tenham sido criados antes da execução do instalador, o script remove preventivamente `Default_Keyring.keyring` e `user.keystore`, unificando tudo no chaveiro canônico `login`.
 
 **Configuração PAM (`/etc/pam.d/greetd`):**
 ```
 auth     optional  pam_gnome_keyring.so
 session  optional  pam_gnome_keyring.so  auto_start
 ```
-Isso garante que o daemon seja iniciado automaticamente com a sessão do `greetd` e que o chaveiro seja desbloqueado pela senha do usuário sem nenhuma interação extra.
 
-**Pré-inicialização do diretório de keyrings (`06_post_install.sh`):**
+**Bloco de Inicialização Defensiva (`06_post_install.sh`):**
 ```bash
+# Inicialização do cofre de credenciais e vínculo canônico com o PAM
+log_info "Configurando integração silenciosa do GNOME Keyring com o PAM..."
 KEYRINGS_DIR="${REAL_HOME}/.local/share/keyrings"
 sudo -u "${REAL_USER}" mkdir -p "${KEYRINGS_DIR}"
+sudo chmod 700 "${KEYRINGS_DIR}"
+
+# Limpeza defensiva de chaveiros avulsos corrompidos gerados fora do PAM
+sudo -u "${REAL_USER}" rm -f "${KEYRINGS_DIR}/Default_Keyring.keyring" "${KEYRINGS_DIR}/user.keystore"
+
+# Define 'login' como o chaveiro padrão do sistema
 echo "login" | sudo -u "${REAL_USER}" tee "${KEYRINGS_DIR}/default" >/dev/null
-chmod 700 "${KEYRINGS_DIR}"
+sudo chmod 600 "${KEYRINGS_DIR}/default"
+sudo chown -R "${REAL_USER}:${REAL_USER}" "${KEYRINGS_DIR}"
+log_success "Ponteiro do chaveiro canônico 'login' configurado em ${KEYRINGS_DIR}/default."
 ```
-O ponteiro `default` informa ao `gnome-keyring` qual chaveiro deve ser desbloqueado automaticamente no login. Sem esse arquivo, o GNOME Keyring exibe o diálogo *"Choose password for new keyring"* no primeiro boot — **armadilha eliminada definitivamente por esta pré-inicialização**.
 
 ### 10.2 Roadmap Futuro: Migração para `oo7`
 
