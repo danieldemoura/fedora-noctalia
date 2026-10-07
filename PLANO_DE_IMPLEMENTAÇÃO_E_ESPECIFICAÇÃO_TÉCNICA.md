@@ -24,6 +24,7 @@ fedora-noctalia-installer/
 ├── config/
 │   ├── packages-base.conf           # Lista de pacotes do sistema (Firmware, Áudio, Portais, XDG)
 │   ├── packages-apps.conf           # Lista de aplicações essenciais do usuário
+│   ├── packages-flatpak.conf        # Lista declarativa de aplicativos Flatpak do Flathub
 │   ├── packages-nvidia.conf         # Lista da pilha de drivers NVIDIA
 │   └── settings.conf                # Variáveis globais (repositórios, versões, flags de ambiente)
 ├── lib/
@@ -51,7 +52,7 @@ fedora-noctalia-installer/
 
 3. **Idempotência:** A reexecução do script (ou de módulos individuais) não deve duplicar linhas em arquivos de configuração (`grep -qF` antes de inserir).
 
-4. **Isolamento de Listas:** Os arquivos `.conf` na pasta `config/` devem conter um pacote por linha, ignorando linhas que comecem com `#` e linhas vazias, permitindo que a IA ou o usuário adicione ou remova softwares apenas comentando uma linha.
+4. **Isolamento de Listas:** Os arquivos `.conf` na pasta `config/` (incluindo `packages-flatpak.conf` para aplicativos Flatpak) devem conter um pacote ou ID de aplicativo por linha, ignorando linhas que comecem com `#` e linhas vazias, permitindo que a IA ou o usuário adicione ou remova softwares apenas comentando uma linha.
 
 ---
 
@@ -72,6 +73,7 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `pipewire-pulseaudio` | **Camada de Compatibilidade:** Socket emulador de PulseAudio para que navegadores, jogos e apps legados toquem som no PipeWire. |
 | `pipewire-alsa` | **Plugin ALSA:** Redireciona chamadas diretas da camada ALSA para o PipeWire. |
 | `NetworkManager-wifi` | **Conectividade Sem Fio:** Submódulo do NetworkManager para escaneamento e conexão a redes Wi-Fi públicas e privadas. |
+| `wpa_supplicant` | **Autenticação e Negociação Wi-Fi (WPA/WPA2/WPA3):** Daemon essencial para autenticação de redes sem fio com criptografia, indispensável para conexões Wi-Fi imediatas após netinstall mínima. |
 | `bluez` & `bluez-tools` | **Pilha Bluetooth:** Drivers e utilitários para pareamento e uso de fones, caixas de som, teclados e mouses Bluetooth. |
 | `dbus-broker` | **Barramento D-Bus de Alta Performance:** Implementação do barramento de comunicação do sistema, mais rápida e segura que o `dbus-daemon`. |
 | `seatd` | **Gerenciador de Assentos (Seat/Sessão):** Fornece permissões de acesso ao hardware de vídeo e teclado para o compositor Wayland sem depender de daemons pesados. |
@@ -82,15 +84,14 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `xdg-desktop-portal` | **Roteador Central de Portais:** Permite que janelas Wayland comuniquem-se de forma segura com o sistema (caixas de diálogo de abrir/salvar arquivos). |
 | `xdg-desktop-portal-gtk` | **Backend de Diálogos GTK:** Renderiza janelas nativas de seleção de arquivos para aplicativos GTK. |
 | `xdg-user-dirs` & `xdg-utils` | **Diretórios de Usuário:** Cria as pastas padrões (`Downloads`, `Documentos`, `Imagens`) e fornece o comando `xdg-open`. |
-| `linux-firmware` | **Firmwares de Hardware:** Microcódigo para placas Wi-Fi (Intel, Realtek, Atheros), chips Bluetooth e GPUs. |
-| `alsa-firmware` | **Firmware de Áudio:** Suporte a controladores de áudio integrados e DSPs de som de notebooks recentes. |
+| `@hardware-support` | **Suporte Universal de Hardware e Firmwares:** Metagrupo oficial do Fedora que engloba toda a coleção de firmwares essenciais (Intel, AMD, Realtek, Broadcom, MediaTek) e suporte a controladores integrados, evitando adaptadores de rede inoperantes. |
 | `intel-microcode` / `amd-ucode-firmware` | **Microcódigo de CPU:** Atualizações de estabilidade e mitigações de segurança para processadores Intel ou AMD. |
 | `tuned` & `tuned-ppd` | **Gerenciamento de Energia Moderno:** Padrão do Fedora desde o F41. O `tuned-ppd` intercepta chamadas de perfil de bateria do Noctalia Shell e alterna os modos de energia. |
 | `brightnessctl` | **Controle de Iluminação:** Utilitário para ajuste fino de brilho da tela e iluminação do teclado retroiluminado. |
 | `upower` | **Monitor de Bateria:** Monitora o consumo de energia, percentual de carga e saúde da bateria do notebook. |
 | `libinput` & `libinput-utils` | **Tratamento de Entrada:** Suporte a touchpads multitoque (gestos de pinça, rolagem com dois dedos e tap-to-click). |
 | `switcheroo-control` | **GPU Híbrida (PRIME):** Daemon D-Bus que permite disparar jogos ou navegadores na placa dedicada NVIDIA sob demanda. |
-| `cups`, `cups-filters`, `ipp-usb` | **Impressão Universal Sem Driver:** Implementa o protocolo IPP Everywhere / Mopria. Detecta e imprime em 95% das impressoras modernas USB e Wi-Fi sem instalar drivers de CD. |
+| `@printing`, `cups-browsed`, `ipp-usb`, `hplip`, `printer-driver-brlaser`, `system-config-printer-udev` | **Impressão Universal (USB Plug-and-Play e Wi-Fi sem driver):** Pilha completa que engloba o metagrupo `@printing`, suporte a impressoras HP (`hplip`), Brother legadas (`printer-driver-brlaser`), criação automática de fila ao plugar USB via `system-config-printer-udev`, descoberta na rede local (`cups-browsed`) e IPP Everywhere sem drivers proprietários. |
 | `sane-backends`, `sane-airscan` | **Digitalização Sem Driver:** Suporte universal para scanners USB e scanners de rede via protocolos eSCL e WSD. |
 | `simple-scan` | **App de Scanner:** Interface visual simples para digitalizar documentos em PDF ou imagem. |
 | `nautilus` | **Gerenciador de Arquivos:** Aplicação moderna em GTK4 para gerenciar arquivos, pastas e discos (manipulação nativa e transparente de compactados via `gnome-autoar`). |
@@ -98,12 +99,11 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `loupe` | **Visualizador de Imagens:** Visualizador moderno em GTK4. Extremamente rápido e seguro. |
 | `papers` | **Visualizador de Documentos:** Sucessor moderno do Evince em GTK4, Libadwaita e Rust, com suporte fluido a gestos multitoque no Wayland. |
 | `gnome-text-editor` | **Editor de Texto:** Substituto moderno do Gedit para notas e arquivos de configuração. |
-| `celluloid` | **Player Multimídia:** Interface GTK limpa baseada no motor MPV. Executa qualquer arquivo de vídeo ou áudio sem travamentos. |
 | `kitty` | **Terminal Acelerado por GPU:** Emulador de terminal padrão, associado de fábrica ao atalho `Mod+Enter` no Umbriel. |
 | `gnome-disk-utility` | **Gerenciador de Discos:** Utilitário visual para formatar pendrives, criar partições e gravar arquivos `.iso`. |
 | `swaylock` | **Bloqueador de Tela Wayland:** Bloqueia a sessão de forma segura usando o protocolo oficial `ext-session-lock-v1`. |
 | `grim`, `slurp`, `wl-clipboard` | **Captura de Tela:** O trio definitivo do Wayland. O `grim` captura a imagem, o `slurp` permite arrastar e selecionar uma área, e o `wl-clipboard` copia para a memória para colar direto no navegador/chat. |
-| `playerctl` | **Controle Multimídia (MPRIS):** Utilitário de linha de comando para controlar reprodutores de áudio e vídeo (Spotify, navegadores, Celluloid) através das teclas Play/Pause, Próxima e Anterior. |
+| `playerctl` | **Controle Multimídia (MPRIS):** Utilitário de linha de comando para controlar reprodutores de áudio e vídeo (Spotify, navegadores, Cine) através das teclas Play/Pause, Próxima e Anterior. |
 | `adwaita-icon-theme` | **Ícones do Sistema:** Pacote oficial que evita ícones quebrados ou invisíveis nas pastas do Nautilus. |
 | `google-noto-*-fonts` | **Tipografia Completa:** Famílias Noto Sans, Serif, CJK (caracteres asiáticos) e Color Emoji para evitar blocos vazios na web. |
 | `glycin-thumbnailer` | **Miniaturas em Sandbox:** Gera miniaturas seguras de imagens WebP, AVIF, SVG, JPEG-XL no Nautilus. |
@@ -145,6 +145,14 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | Pacote | Função e Importância no Sistema |
 | :--- | :--- |
 | `brave-origin` | **Navegador Web Minimalista Oficial:** Versão do Brave empacotada oficialmente pela Brave Software sem IA (Leo), sem carteira de criptomoedas e sem telemetria. Mantém apenas o bloqueador de anúncios e o motor Chromium (gratuito no Linux). |
+
+### 2.6 Repositório Flathub (Aplicações em Sandbox)
+
+Para manter o desacoplamento arquitetural e a Separação de Preocupações (SoC), aplicações de usuário empacotadas em sandbox são declaradas exclusivamente em `config/packages-flatpak.conf`, sem hardcoding nos scripts shell do instalador.
+
+| Pacote / ID Flatpak | Função e Importância no Sistema |
+| :--- | :--- |
+| `io.github.diegopvlk.Cine` | **Reprodutor de Vídeo Moderno:** Player multimídia elegante em GTK4/Libadwaita. O instalador aplica o override de permissão global (`--filesystem=home`) para que o aplicativo possa abrir vídeos, legendas e pastas diretamente da pasta pessoal do usuário (`~`) sem restrições de sandbox. |
 
 ---
 
@@ -273,7 +281,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 
    * Ler `/proc/cpuinfo`. Se Intel: `intel-microcode`. Se AMD: `amd-ucode-firmware`.
 
-   * Instalar `linux-firmware` e `alsa-firmware`.
+   * Instalar o metagrupo `@hardware-support` (garante reconhecimento universal de chips Wi-Fi Intel, Realtek, Broadcom, MediaTek e controladores de som).
 
 2. Instalar utilitários de notebook e energia:
 
@@ -281,16 +289,23 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 
    * Ativar o serviço de perfil de energia: `sudo systemctl enable --now tuned.service`.
 
-3. Instalar infraestrutura de som, rede e segurança:
+3. Instalar infraestrutura de som, rede, impressão e segurança:
 
-   * `pipewire`, `wireplumber`, `pipewire-pulseaudio`, `pipewire-alsa`, `NetworkManager-wifi`, `bluez`, `bluez-tools`, `seatd`, `dbus-broker`.
+   * `pipewire`, `wireplumber`, `pipewire-pulseaudio`, `pipewire-alsa`, `NetworkManager-wifi`, `wpa_supplicant`, `bluez`, `bluez-tools`, `seatd`, `dbus-broker`.
 
-   * `cups`, `cups-filters`, `ipp-usb`, `sane-backends`, `sane-airscan`.
+   * `@printing`, `cups-browsed`, `ipp-usb`, `hplip`, `printer-driver-brlaser`, `system-config-printer-udev`, `avahi`, `sane-backends`, `sane-airscan`.
 
-   * Ativar serviços essenciais:
+   * Ativar serviços essenciais e sockets de hardware:
 
      ```bash
-     sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service avahi-daemon.service
+     sudo systemctl enable --now NetworkManager.service bluetooth.service cups.socket cups.service cups-browsed.service avahi-daemon.service
+     ```
+
+   * Liberar serviços de descoberta de impressoras (mDNS e IPP) no firewall (se `firewalld` estiver ativo):
+
+     ```bash
+     sudo firewall-cmd --add-service=mdns --add-service=ipp --add-service=ipp-client --permanent
+     sudo firewall-cmd --reload
      ```
 
 ---
@@ -383,7 +398,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
    * Utilizar a flag `--allowerasing` nas chamadas do DNF deste módulo.
 
 2. **Instalar os programas de uso diário aprovados:**
-   * Produtividade: `kitty`, `nautilus`, `loupe`, `papers`, `gnome-text-editor`, `celluloid`, `simple-scan`, `gnome-disk-utility`.
+   * Produtividade: `kitty`, `nautilus`, `loupe`, `papers`, `gnome-text-editor`, `simple-scan`, `gnome-disk-utility`.
    * Captura de tela e controle multimídia: `grim`, `slurp`, `wl-clipboard`, `playerctl`.
    * Utilitários de backend para arquivos compactados: `p7zip`, `p7zip-plugins`, `unrar`, `zstd`, `tar`, `xz`, `unzip`.
    * Miniaturas: `glycin-thumbnailer`, `ffmpegthumbnailer`, `papers-thumbnailer`.
@@ -397,6 +412,13 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
    * Remover atalho legado `/usr/share/applications/flathub-store.desktop` (se existir).
    * Instalar o pacote oficial: `sudo dnf install -y --allowerasing gnome-software`.
    * Assegurar que o repositório oficial Flathub continue configurado (`sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo`), proporcionando integração completa com a loja para pesquisa, instalação de Flatpaks e atualizações gráficas do sistema.
+
+5. **Instalação Declarativa de Aplicativos Flatpak:**
+   * Ler iterativamente as linhas válidas de `config/packages-flatpak.conf` e instalar cada aplicativo:
+     ```bash
+     sudo flatpak install -y flathub <app_id>
+     ```
+   * Aplicar overrides de permissão requeridos por aplicativos específicos (ex: `sudo flatpak override io.github.diegopvlk.Cine --filesystem=home` para permitir acesso aos vídeos e pastas do usuário).
 
 ---
 
@@ -515,6 +537,8 @@ Abaixo está o registro técnico consolidado de todos os comportamentos inespera
 | **Isolamento de Máquina Virtual** | Módulo de GPU tentava configurar `switcheroo-control` e VA-API dedicados na VM. | Saída antecipada limpa (`return 0`) no início de `02_gpu_drivers.sh` quando `IS_VM=true`. |
 | **Display Manager em VM (Greetd)** | Usuário `greetd` não possuía acesso ao hardware de vídeo resultando em tela preta no boot. | Atribuição dos grupos `video,render,input` ao usuário `greetd` e flags de renderização por software (`LIBGL_ALWAYS_SOFTWARE=1`). |
 | **Armadilha do Chaveiro / "Default Keyring" Bloqueado** | Diálogo *"An application wants access to the keyring 'Default Keyring', but it is locked"*. O módulo PAM (`pam_gnome_keyring.so`) só desbloqueia o chaveiro `login.keyring`, enquanto apps (Brave, Git, Wi-Fi) solicitam via D-Bus o chaveiro `default`. Sem o arquivo ponteiro, o daemon tenta criar `Default_Keyring.keyring`, que nunca é desbloqueado pelo PAM. Além disso, no Fedora `pam_gnome_keyring.so` reside no pacote separado `gnome-keyring-pam`. | 1. Instalação obrigatória de `gnome-keyring-pam` via DNF.<br>2. Pré-criação de `~/.local/share/keyrings/default` com `login` (perm `600`, pasta `700`), redirecionando apps ao `login.keyring` já destrancado pelo PAM.<br>3. Limpeza defensiva preventiva de `Default_Keyring.keyring` e `user.keystore`. |
+| **Wi-Fi e Bluetooth inativos após Netinstall** | Causa raiz na divisão do `linux-firmware` do Fedora e falta do negociador de autenticação WPA na imagem mínima. | Adoção do metagrupo `@hardware-support` (cobertura universal Intel, AMD, Realtek, Broadcom, MediaTek) em conjunto com `wpa_supplicant`. |
+| **Impressoras USB/Rede não detectadas no navegador** | Causa raiz na ausência de regras udev e do daemon de descoberta em ambiente Wayland enxuto (sem filas automáticas para impressoras conectadas via USB ou portas abertas para descoberta de rede). | Metagrupo `@printing`, `cups-browsed`, `system-config-printer-udev`, `hplip`, `printer-driver-brlaser`, liberação das portas mDNS/IPP no firewall e ativação coordenada dos serviços do CUPS (`cups.socket`, `cups.service`, `cups-browsed.service`, `avahi-daemon.service`). |
 
 ---
 

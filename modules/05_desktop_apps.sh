@@ -66,4 +66,22 @@ if command -v flatpak >/dev/null 2>&1; then
 fi
 log_success "Loja Gráfica GNOME Software e integração Flathub configuradas."
 
+# 5. Instalação Declarativa de Aplicativos Flatpak
+FLATPAK_CONF="${INSTALLER_ROOT}/config/packages-flatpak.conf"
+if [[ -f "$FLATPAK_CONF" ]] && command -v flatpak >/dev/null 2>&1; then
+    log_info "Instalando aplicativos declarativos via Flatpak (Flathub)..."
+    while IFS= read -r app_id || [[ -n "$app_id" ]]; do
+        app_id="$(echo "$app_id" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        [[ -z "$app_id" || "$app_id" =~ ^# ]] && continue
+
+        log_info "Instalando Flatpak: ${app_id}..."
+        sudo flatpak install -y flathub "$app_id" || log_warn "Falha ao instalar Flatpak: ${app_id}"
+
+        if [[ "$app_id" == "io.github.diegopvlk.Cine" ]]; then
+            log_info "Aplicando permissão de acesso ao diretório pessoal para ${app_id}..."
+            sudo flatpak override io.github.diegopvlk.Cine --filesystem=home
+        fi
+    done < "$FLATPAK_CONF"
+fi
+
 log_success "Módulo 05 (Aplicações Desktop) concluído com sucesso."

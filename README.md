@@ -8,6 +8,7 @@ Instalador modular, limpo e automatizado para transformar uma instalação míni
 * **Compatibilidade X11:** `xwayland-satellite` (rootless isolado)
 * **Navegador Web:** Brave Origin (sem telemetria, IA ou criptomoedas)
 * **Loja de Apps:** GNOME Software (Loja gráfica nativa com integração ao Flathub e atualizações do sistema)
+* **Reprodutor de Vídeo:** Cine (`io.github.diegopvlk.Cine` via Flatpak)
 
 ---
 
@@ -21,6 +22,7 @@ fedora-noctalia/
 ├── config/
 │   ├── packages-base.conf           # Infraestrutura do sistema (Firmware, Áudio, Portais, XDG)
 │   ├── packages-apps.conf           # Aplicações de uso diário, codecs multimídia e fontes
+│   ├── packages-flatpak.conf        # Lista declarativa de aplicativos Flatpak do Flathub
 │   ├── packages-nvidia.conf         # Pilha proprietária de drivers e módulos NVIDIA
 │   └── settings.conf                # Variáveis globais, repositórios e flags padrão
 ├── lib/
@@ -104,6 +106,30 @@ chmod +x setup.sh modules/*.sh
 
 5. **Suporte Transparente para Máquinas Virtuais:**
    Em máquinas virtuais, o script desativa automaticamente os drivers proprietários NVIDIA, ativa renderização por software (`LIBGL_ALWAYS_SOFTWARE=1`) e desativa o cursor por hardware (`hardware_cursor = false`), garantindo boot suave e mouse responsivo no VirtualBox e VMware.
+
+---
+
+## 📦 Modularidade de Aplicativos Flatpak
+
+O projeto segue rigorosamente o princípio de **Separação de Preocupações (SoC)** e arquitetura declarativa. Nenhuma aplicação de usuário em sandbox fica hardcoded nos scripts shell:
+* **Lista Declarativa Dedicada:** Todos os aplicativos Flatpak são gerenciados através do arquivo `config/packages-flatpak.conf`.
+* **Facilidade de Expansão:** Para adicionar novos aplicativos Flatpak (por exemplo: Spotify, Discord, OBS Studio, Steam), basta inserir o ID do pacote (ex: `com.spotify.Client`, `com.discordapp.Discord`) em uma nova linha desse arquivo.
+* **Zero Alteração em Código:** O instalador detecta e instala dinamicamente todas as entradas listadas via Flathub, sem que você precise mexer em nenhum script do repositório.
+
+---
+
+## 🖨️ Suporte Universal de Hardware e Impressão
+
+### Suporte Universal de Hardware (Wi-Fi e Bluetooth)
+Em instalações mínimas (Netinstall), o Fedora fraciona os pacotes de firmware por fabricante. O instalador adota o metagrupo oficial **`@hardware-support`** em conjunto com o daemon **`wpa_supplicant`**, garantindo:
+* Reconhecimento imediato de qualquer adaptador Wi-Fi e Bluetooth (Intel, AMD, Realtek, Broadcom, MediaTek, Atheros).
+* Negociação transparente de redes Wi-Fi com segurança WPA/WPA2/WPA3 sem necessidade de depuração de drivers proprietários.
+
+### Suporte Universal de Impressão (Plug-and-Play e Wi-Fi)
+O sistema vem totalmente preparado para operar com qualquer fabricante de impressora (HP, Epson, Brother, Canon) em ambiente Wayland puro:
+* **Detecção Automática na Rede:** Configura o metagrupo `@printing`, `cups-browsed` e `avahi-daemon`, liberando automaticamente as portas mDNS e IPP no firewall (`firewalld`). Dispositivos Wi-Fi modernos que utilizam os protocolos IPP Everywhere e Mopria são detectados na rede local de forma instantânea em navegadores e caixas de diálogo do sistema, sem necessidade de drivers manuais.
+* **Plug-and-Play Instantâneo via USB:** Através do `system-config-printer-udev`, plugar o cabo USB de uma impressora gera automaticamente a fila correspondente no CUPS.
+* **Compatibilidade Estendida:** Inclui suporte nativo para impressoras HP via `hplip` e impressoras Brother legadas via `printer-driver-brlaser`.
 
 ---
 

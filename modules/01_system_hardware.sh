@@ -63,10 +63,12 @@ if systemctl list-unit-files | grep -q "tuned.service"; then
 fi
 
 # Conectividade e Periféricos
-for srv in NetworkManager.service bluetooth.service cups.service avahi-daemon.service; do
-    if systemctl list-unit-files | grep -q "$srv"; then
-        sudo systemctl enable --now "$srv" || log_warn "Aviso ao ativar ${srv}."
-    fi
-done
+sudo systemctl enable --now NetworkManager.service bluetooth.service cups.socket cups.service cups-browsed.service avahi-daemon.service || true
+
+if systemctl is-active --quiet firewalld 2>/dev/null; then
+    log_info "Liberando serviços de descoberta de impressoras (mDNS e IPP) no firewall..."
+    sudo firewall-cmd --add-service=mdns --add-service=ipp --add-service=ipp-client --permanent >/dev/null 2>&1 || true
+    sudo firewall-cmd --reload >/dev/null 2>&1 || true
+fi
 
 log_success "Módulo 01 (Hardware e Áudio) concluído com sucesso."
