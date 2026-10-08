@@ -40,12 +40,6 @@ sudo chmod 600 "${KEYRINGS_DIR}/default"
 sudo chown -R "${REAL_USER}:${REAL_USER}" "${KEYRINGS_DIR}"
 log_success "Ponteiro do chaveiro canônico 'login' configurado em ${KEYRINGS_DIR}/default."
 
-# 2. Localização do Agente Polkit
-POLKIT_AGENT_PATH="/usr/libexec/kf6/polkit-kde-authentication-agent-1"
-if [[ ! -f "$POLKIT_AGENT_PATH" ]]; then
-    log_warn "Caminho do polkit-kde não encontrado exatamente em /usr/libexec/kf6. Mantendo padrão."
-fi
-
 # 3. Configuração Oficial do Umbriel (~/.config/umbriel/config.toml)
 UMBRIEL_CONFIG_DIR="${REAL_HOME}/.config/umbriel"
 UMBRIEL_CONFIG_FILE="${UMBRIEL_CONFIG_DIR}/config.toml"
@@ -73,7 +67,7 @@ fi
 
 log_info "Aplicando ajustes no arquivo de configuração do Umbriel..."
 
-python3 - "$UMBRIEL_CONFIG_FILE" "${IS_VM:-false}" "${KEYBOARD_ABNT2:-true}" "$POLKIT_AGENT_PATH" "$NOCTALIA_CMD" <<'PYEOF'
+python3 - "$UMBRIEL_CONFIG_FILE" "${IS_VM:-false}" "${KEYBOARD_ABNT2:-true}" "$NOCTALIA_CMD" <<'PYEOF'
 import os
 import re
 import sys
@@ -89,8 +83,7 @@ except ImportError:
 config_file = sys.argv[1]
 is_vm = (sys.argv[2].lower() == "true")
 is_abnt2 = (sys.argv[3].lower() == "true")
-polkit_bin = sys.argv[4]
-noctalia_cmd = sys.argv[5]
+noctalia_cmd = sys.argv[4]
 
 content = ""
 if os.path.exists(config_file):
@@ -125,8 +118,7 @@ if old_marker in content:
 
 # 2. Configuração de [general] e autostart (garante cabeçalho explícito e ativo)
 autostart_formatted = f'''autostart = [
-    "{noctalia_cmd}",
-    "{polkit_bin}"
+    "{noctalia_cmd}"
 ]'''
 
 # Remove comentário de "# [general]" ou "#[general]" para ativar a seção
@@ -239,13 +231,6 @@ if [[ -x "/usr/bin/noctalia-greeter-session" ]] || command -v noctalia-greeter-s
     log_success "[Checklist] Binário /usr/bin/noctalia-greeter-session verificado no disco."
 else
     log_warn "[Checklist] Binário noctalia-greeter-session não encontrado com permissão de execução."
-fi
-
-# Teste 3: Polkit agent (polkit-kde)
-if [[ -x "$POLKIT_AGENT_PATH" ]] || [[ -f "$POLKIT_AGENT_PATH" ]]; then
-    log_success "[Checklist] Agente polkit (polkit-kde) verificado e executável em: ${POLKIT_AGENT_PATH}."
-else
-    log_warn "[Checklist] Agente polkit (polkit-kde) não localizado ou sem permissão de execução em: ${POLKIT_AGENT_PATH}."
 fi
 
 # Teste 4: Umbriel config sintaxe e validação oficial

@@ -5,6 +5,7 @@ Instalador modular, limpo e automatizado para transformar uma instalação míni
 * **Compositor Wayland:** [Umbriel](https://github.com/fyralabs/umbriel) (`umbriel-nightly` via Fyra Labs / Terra)
 * **Desktop Shell:** [Noctalia Shell](https://github.com/noctalia-dev/noctalia) (`noctalia` nativo C++/QtQuick)
 * **Gerenciador de Login:** [Greetd](https://git.sr.ht/~kennylevinsen/greetd) + [Noctalia Greeter](https://github.com/noctalia-dev/noctalia-greeter)
+* **Emulador de Terminal & CLI:** [Kitty](https://sw.kovidgoyal.net/kitty/) (acelerado por GPU) + `fastfetch` (informações de sistema)
 * **Compatibilidade X11:** `xwayland-satellite` (rootless isolado)
 * **Navegador Web:** Brave Origin (sem telemetria, IA ou criptomoedas)
 * **Loja de Apps:** GNOME Software (Loja gráfica nativa com integração ao Flathub e atualizações do sistema)
@@ -158,6 +159,26 @@ O instalador foi projetado para acompanhar automaticamente o ciclo de lançament
 - O endereço dos espelhos do **RPM Fusion** usa `$(rpm -E %fedora)`, que resolve para o número da versão atual em tempo de execução.
 - O repositório **Terra** usa `$releasever`, resolvido nativamente pelo DNF5.
 - Ambos funcionam corretamente em **Fedora 44, 45, 46…** sem qualquer alteração no código.
+
+---
+
+## 🔐 Autenticação Gráfica (Agente Polkit no Noctalia Shell)
+
+### O que é e para que serve
+O **Agente Polkit** é o componente responsável por desenhar a janela na tela solicitando a senha de administrador quando aplicativos gráficos realizam ações privilegiadas (como formatar pendrives no GNOME Discos, gerenciar partições ou modificar configurações avançadas do sistema).
+
+### Por que o instalador não inclui o KDE Polkit
+O instalador removeu o pacote `polkit-kde` para manter o sistema limpo, leve e sem dependências pesadas do KDE Frameworks 6 (KF6). O Noctalia Shell possui um agente Polkit nativo perfeitamente integrado à sua interface Wayland em QML/QtQuick.
+
+### Como ativar nativamente pela interface gráfica do Noctalia (Passo a Passo Oficial)
+
+> ⚠️ **Recomendação Pós-Instalação:** Para que aplicativos gráficos solicitem sua senha com a interface nativa do sistema:
+> 1. Abra a **Central de Configurações do Noctalia** (pelo lançador de aplicativos ou atalho no painel).
+> 2. No menu lateral esquerdo, clique em **Segurança** 🛡️.
+> 3. Na seção/aba **Autenticação**, localize a opção **Agente Polkit** (*"Habilitar o agente de autenticação integrado"*).
+> 4. Ative a chave seletora para **Ligado (ON)**.
+> 
+> Pronto! A partir desse momento, qualquer aplicativo gráfico que exigir privilégios de root abrirá a janela de autenticação nativa, elegante e com o mesmo tema do seu desktop.
 
 ---
 

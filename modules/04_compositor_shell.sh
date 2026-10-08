@@ -30,7 +30,6 @@ sudo dnf install -y \
     xdg-desktop-portal-gtk \
     xdg-desktop-portal-umbriel-nightly \
     polkit \
-    polkit-kde \
     gnome-keyring \
     libsecret \
     swaylock
@@ -49,12 +48,5 @@ org.freedesktop.impl.portal.Screenshot=umbriel;
 EOF
 
 log_success "Portais XDG configurados."
-
-# 3. Verificação do Agente de Autenticação Polkit
-if [[ -x "/usr/libexec/kf6/polkit-kde-authentication-agent-1" ]] || [[ -f "/usr/libexec/kf6/polkit-kde-authentication-agent-1" ]]; then
-    log_success "Agente polkit-kde localizado no sistema."
-else
-    log_warn "Agente polkit-kde não localizado no caminho padrão (/usr/libexec/kf6/polkit-kde-authentication-agent-1)."
-fi
 
 log_success "Módulo 04 (Compositor e Shell) concluído com sucesso."

@@ -78,7 +78,6 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `dbus-broker` | **Barramento D-Bus de Alta Performance:** Implementação do barramento de comunicação do sistema, mais rápida e segura que o `dbus-daemon`. |
 | `seatd` | **Gerenciador de Assentos (Seat/Sessão):** Fornece permissões de acesso ao hardware de vídeo e teclado para o compositor Wayland sem depender de daemons pesados. |
 | `polkit` | **Framework de Autorização:** Gerencia a elevação de privilégios para tarefas administrativas. |
-| `polkit-kde` | **Agente Gráfico de Senhas:** Agente moderno e seguro oficial do Fedora em Qt6/KF6 para autenticação gráfica. |
 | `gnome-keyring` & `libsecret` | **Cofre de Chaves e Senhas:** Guarda credenciais de Wi-Fi, chaves SSH e senhas de navegadores com criptografia segura. |
 | `gnome-keyring-pam` | **Módulo PAM:** Intercepta a senha de login do Greetd e desbloqueia silenciosamente o chaveiro 'login.keyring' no início da sessão gráfica. |
 | `xdg-desktop-portal` | **Roteador Central de Portais:** Permite que janelas Wayland comuniquem-se de forma segura com o sistema (caixas de diálogo de abrir/salvar arquivos). |
@@ -100,6 +99,7 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `papers` | **Visualizador de Documentos:** Sucessor moderno do Evince em GTK4, Libadwaita e Rust, com suporte fluido a gestos multitoque no Wayland. |
 | `gnome-text-editor` | **Editor de Texto:** Substituto moderno do Gedit para notas e arquivos de configuração. |
 | `kitty` | **Terminal Acelerado por GPU:** Emulador de terminal padrão, associado de fábrica ao atalho `Mod+Enter` no Umbriel. |
+| `fastfetch` | **Utilitário de Informações de Sistema:** Utilitário para exibição de informações de hardware/sistema no terminal. |
 | `gnome-disk-utility` | **Gerenciador de Discos:** Utilitário visual para formatar pendrives, criar partições e gravar arquivos `.iso`. |
 | `swaylock` | **Bloqueador de Tela Wayland:** Bloqueia a sessão de forma segura usando o protocolo oficial `ext-session-lock-v1`. |
 | `grim`, `slurp`, `wl-clipboard` | **Captura de Tela:** O trio definitivo do Wayland. O `grim` captura a imagem, o `slurp` permite arrastar e selecionar uma área, e o `wl-clipboard` copia para a memória para colar direto no navegador/chat. |
@@ -382,7 +382,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 
    * `xdg-desktop-portal`, `xdg-desktop-portal-gtk`, `xdg-desktop-portal-umbriel-nightly`.
 
-   * `polkit`, `polkit-kde`, `gnome-keyring`, `gnome-keyring-pam`, `libsecret`.
+   * `polkit`, `gnome-keyring`, `gnome-keyring-pam`, `libsecret`.
 
    * `swaylock` (Bloqueador de tela).
 
@@ -398,7 +398,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
    * Utilizar a flag `--allowerasing` nas chamadas do DNF deste módulo.
 
 2. **Instalar os programas de uso diário aprovados:**
-   * Produtividade: `kitty`, `nautilus`, `loupe`, `papers`, `gnome-text-editor`, `simple-scan`, `gnome-disk-utility`.
+   * Produtividade: `kitty`, `fastfetch`, `nautilus`, `loupe`, `papers`, `gnome-text-editor`, `simple-scan`, `gnome-disk-utility`.
    * Captura de tela e controle multimídia: `grim`, `slurp`, `wl-clipboard`, `playerctl`.
    * Utilitários de backend para arquivos compactados: `p7zip`, `p7zip-plugins`, `unrar`, `zstd`, `tar`, `xz`, `unzip`.
    * Miniaturas: `glycin-thumbnailer`, `ffmpegthumbnailer`, `papers-thumbnailer`.
@@ -447,16 +447,14 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
        ```toml
        [general]
        autostart = [
-           "noctalia",
-           "/usr/libexec/kf6/polkit-kde-authentication-agent-1"
+           "noctalia"
        ]
        ```
      * **Máquina Virtual:**
        ```toml
        [general]
        autostart = [
-           "env LIBGL_ALWAYS_SOFTWARE=1 noctalia",
-           "/usr/libexec/kf6/polkit-kde-authentication-agent-1"
+           "env LIBGL_ALWAYS_SOFTWARE=1 noctalia"
        ]
        ```
    * **Cursor na VM (`[input.cursor]`):**
@@ -496,7 +494,6 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
 A IA que escrever o script deve fornecer testes internos de integridade que validem os seguintes itens antes de permitir o reboot:
 
 - [ ] **Validação do Greetd:** Testar se o arquivo `/etc/greetd/config.toml` foi escrito com `user = "greetd"` e verificar se o binário apontado no `command` existe no disco.
-- [ ] **Validação do Polkit:** Confirmar que `/usr/libexec/kf6/polkit-kde-authentication-agent-1` existe e possui permissão de execução.
 - [ ] **Validação do Umbriel:** Checar a sintaxe TOML de `~/.config/umbriel/config.toml` com `tomllib.loads()`.
 - [ ] **Validação Oficial do Umbriel:** Executar `sudo -u "$REAL_USER" umbriel config validate` garantindo que o compositor não reporte erros de sintaxe ou chaves desconhecidas.
 - [ ] **Validação de Permissões:** Garantir que os diretórios `~/.config` e `~/.local` pertençam ao usuário real (`chown -R $USER:$USER`), e não ao `root`.
