@@ -63,7 +63,7 @@ if systemctl list-unit-files | grep -q "tuned.service"; then
 fi
 
 # Conectividade e Periféricos
-sudo systemctl enable --now NetworkManager.service bluetooth.service cups.socket cups.service cups-browsed.service avahi-daemon.service || true
+sudo systemctl enable --now NetworkManager.service bluetooth.service udisks2.service cups.socket cups.service cups-browsed.service avahi-daemon.service || true
 
 if systemctl is-active --quiet firewalld 2>/dev/null; then
     log_info "Liberando serviços de descoberta de impressoras (mDNS e IPP) no firewall..."

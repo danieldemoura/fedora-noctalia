@@ -77,6 +77,8 @@ Todos os pacotes a seguir foram auditados e confirmados para a base do **Fedora 
 | `bluez` & `bluez-tools` | **Pilha Bluetooth:** Drivers e utilitários para pareamento e uso de fones, caixas de som, teclados e mouses Bluetooth. |
 | `dbus-broker` | **Barramento D-Bus de Alta Performance:** Implementação do barramento de comunicação do sistema, mais rápida e segura que o `dbus-daemon`. |
 | `seatd` | **Gerenciador de Assentos (Seat/Sessão):** Fornece permissões de acesso ao hardware de vídeo e teclado para o compositor Wayland sem depender de daemons pesados. |
+| `udisks2` | **Gerenciamento de Discos e Armazenamento:** Daemon central D-Bus para operações de montagem, desmontagem e gerenciamento de discos/partições no Nautilus e GNOME Discos sem exigir intervenção manual de root. |
+| `ntfs-3g` | **Driver de Sistema de Arquivos NTFS:** Driver em espaço de usuário (FUSE) e ferramentas de integridade para leitura e gravação em sistemas de arquivos do Windows (NTFS). |
 | `polkit` | **Framework de Autorização:** Gerencia a elevação de privilégios para tarefas administrativas. |
 | `gnome-keyring` & `libsecret` | **Cofre de Chaves e Senhas:** Guarda credenciais de Wi-Fi, chaves SSH e senhas de navegadores com criptografia segura. |
 | `gnome-keyring-pam` | **Módulo PAM:** Intercepta a senha de login do Greetd e desbloqueia silenciosamente o chaveiro 'login.keyring' no início da sessão gráfica. |
@@ -298,7 +300,7 @@ A IA geradora deve estruturar a execução dos scripts nos seguintes passos lóg
    * Ativar serviços essenciais e sockets de hardware:
 
      ```bash
-     sudo systemctl enable --now NetworkManager.service bluetooth.service cups.socket cups.service cups-browsed.service avahi-daemon.service
+     sudo systemctl enable --now NetworkManager.service bluetooth.service udisks2.service cups.socket cups.service cups-browsed.service avahi-daemon.service
      ```
 
    * Liberar serviços de descoberta de impressoras (mDNS e IPP) no firewall (se `firewalld` estiver ativo):
@@ -536,6 +538,7 @@ Abaixo está o registro técnico consolidado de todos os comportamentos inespera
 | **Armadilha do Chaveiro / "Default Keyring" Bloqueado** | Diálogo *"An application wants access to the keyring 'Default Keyring', but it is locked"*. O módulo PAM (`pam_gnome_keyring.so`) só desbloqueia o chaveiro `login.keyring`, enquanto apps (Brave, Git, Wi-Fi) solicitam via D-Bus o chaveiro `default`. Sem o arquivo ponteiro, o daemon tenta criar `Default_Keyring.keyring`, que nunca é desbloqueado pelo PAM. Além disso, no Fedora `pam_gnome_keyring.so` reside no pacote separado `gnome-keyring-pam`. | 1. Instalação obrigatória de `gnome-keyring-pam` via DNF.<br>2. Pré-criação de `~/.local/share/keyrings/default` com `login` (perm `600`, pasta `700`), redirecionando apps ao `login.keyring` já destrancado pelo PAM.<br>3. Limpeza defensiva preventiva de `Default_Keyring.keyring` e `user.keystore`. |
 | **Wi-Fi e Bluetooth inativos após Netinstall** | Causa raiz na divisão do `linux-firmware` do Fedora e falta do negociador de autenticação WPA na imagem mínima. | Adoção do metagrupo `@hardware-support` (cobertura universal Intel, AMD, Realtek, Broadcom, MediaTek) em conjunto com `wpa_supplicant`. |
 | **Impressoras USB/Rede não detectadas no navegador** | Causa raiz na ausência de regras udev e do daemon de descoberta em ambiente Wayland enxuto (sem filas automáticas para impressoras conectadas via USB ou portas abertas para descoberta de rede). | Metagrupo `@printing`, `cups-browsed`, `system-config-printer-udev`, `hplip`, `printer-driver-brlaser`, liberação das portas mDNS/IPP no firewall e ativação coordenada dos serviços do CUPS (`cups.socket`, `cups.service`, `cups-browsed.service`, `avahi-daemon.service`). |
+| **Partições do Windows (NTFS), pendrives e discos secundários não montam pelo gerenciador de arquivos (Nautilus)** | O Fedora Minimal (Netinstall) não instala o daemon `udisks2` nem o pacote `ntfs-3g` no grupo `@core`, impossibilitando chamadas de montagem via D-Bus pelo Nautilus. | Inclusão de `udisks2` e `ntfs-3g` em `config/packages-base.conf` e habilitação do serviço `udisks2.service` no Módulo 01. |
 
 ---
 

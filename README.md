@@ -108,6 +108,9 @@ chmod +x setup.sh modules/*.sh
 5. **Suporte Transparente para Máquinas Virtuais:**
    Em máquinas virtuais, o script desativa automaticamente os drivers proprietários NVIDIA, ativa renderização por software (`LIBGL_ALWAYS_SOFTWARE=1`) e desativa o cursor por hardware (`hardware_cursor = false`), garantindo boot suave e mouse responsivo no VirtualBox e VMware.
 
+6. **Gerenciamento de Armazenamento e Montagem Automática (NTFS / USB / Discos Internos):**
+   Suporte nativo e automático a discos rígidos internos, partições do Windows (NTFS) e dispositivos de armazenamento USB removíveis via `udisks2` e `ntfs-3g`, funcionando diretamente pelo gerenciador de arquivos (Nautilus) e GNOME Discos sem necessidade de montagem manual no terminal via `mount`.
+
 ---
 
 ## 📦 Modularidade de Aplicativos Flatpak
